@@ -61,26 +61,26 @@ packages:
     dependency: "direct main"
     description:
       name: firebase_core
-      sha256: "26de145bb9688a90962faec6f838247377b0b0d32cc0abecd9a4e43525fc856c"
+      sha256: "967dae9a65f69377beb9f4ab292ea63ce5befa1ce24682cab1b69ca4b7a46927"
       url: "https://pub.dev"
     source: hosted
-    version: "2.32.0"
+    version: "4.1.0"
   firebase_core_platform_interface:
     dependency: transitive
     description:
       name: firebase_core_platform_interface
-      sha256: "8bcfad6d7033f5ea951d15b867622a824b13812178bfec0c779b9d81de011bbb"
+      sha256: "5dbc900677dcbe5873d22ad7fbd64b047750124f1f9b7ebe2a33b9ddccc838eb"
       url: "https://pub.dev"
     source: hosted
-    version: "5.4.2"
+    version: "6.0.0"
   firebase_core_web:
     dependency: transitive
     description:
       name: firebase_core_web
-      sha256: eb3afccfc452b2b2075acbe0c4b27de62dd596802b4e5e19869c1e926cbb20b3
+      sha256: f7ee08febc1c4451588ce58ffcf28edaee857e9a196fee88b85deb889990094a
       url: "https://pub.dev"
     source: hosted
-    version: "2.24.0"
+    version: "3.1.0"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -90,10 +90,10 @@ packages:
     dependency: "direct dev"
     description:
       name: flutter_lints
-      sha256: "5398f14efa795ffb7a33e9b6a08798b26a180edac4ad7db3f231e40f82ce11e1"
+      sha256: "3105dc8492f6183fb076ccf1f351ac3d60564bff92e20bfc4af9cc1651f4e7e1"
       url: "https://pub.dev"
     source: hosted
-    version: "5.0.0"
+    version: "6.0.0"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -108,10 +108,10 @@ packages:
     dependency: transitive
     description:
       name: leak_tracker
-      sha256: "8dcda04c3fc16c14f48a7bb586d4be1f0d1572731b6d81d51772ef47c02081e0"
+      sha256: "33e2e26bdd85a0112ec15400c8cbffea70d0f9c3407491f672a2fad47915e2de"
       url: "https://pub.dev"
     source: hosted
-    version: "11.0.1"
+    version: "11.0.2"
   leak_tracker_flutter_testing:
     dependency: transitive
     description:
@@ -132,10 +132,10 @@ packages:
     dependency: transitive
     description:
       name: lints
-      sha256: c35bb79562d980e9a453fc715854e1ed39e24e7d0297a880ef54e17f9874a9d7
+      sha256: a5e2b223cb7c9c8efdc663ef484fdd95bb243bff242ef5b13e26883547fce9a0
       url: "https://pub.dev"
     source: hosted
-    version: "5.1.1"
+    version: "6.0.0"
   matcher:
     dependency: transitive
     description:
