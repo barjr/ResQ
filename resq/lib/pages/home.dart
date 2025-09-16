@@ -8,16 +8,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  CrossFadeState _crossFadeState = CrossFadeState.showFirst;
-
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration(seconds: 1), () {
+    Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
-        setState(() {
-          _crossFadeState = CrossFadeState.showSecond;
-        });
+        setState(() {});
       }
     });
   }
