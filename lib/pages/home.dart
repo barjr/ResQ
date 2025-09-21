@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -8,75 +9,100 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Form key for validation
   final _formKey = GlobalKey<FormState>();
-
-  // Controllers for text fields
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  // Loading state
   bool _isLoading = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
-    // Clean up controllers
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  // Login logic
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual login logic
-      await Future.delayed(const Duration(seconds: 2)); // Simulated API call
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-      // Navigate to dashboard after successful login
-      if (mounted) {
-        // Show success message briefly
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Login successful!')));
-
-        // Navigate to dashboard (replace current page)
-        Navigator.pushReplacementNamed(context, '/dashboard');
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login successful!')),
+      );
+      // No need to navigate; AuthGate will rebuild to Dashboard
+    } on FirebaseAuthException catch (e) {
+      final msg = _friendlyError(e);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $msg')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Create account logic
-  void _handleCreateAccount() {
-    // TODO: Create registration page and uncomment this line:
-    // Navigator.pushNamed(context, '/register');
+  Future<void> _handleCreateAccount() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
-    // For now, show a placeholder message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Create Account functionality coming soon!'),
-        backgroundColor: Color(0xFFFC3B3C),
-      ),
-    );
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account created! You are signed in.')),
+      );
+      //take you to Dashboard automatically
+    } on FirebaseAuthException catch (e) {
+      final msg = _friendlyError(e);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign up failed: $msg')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign up failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+//TODO: boilerplate, change for security 
+  String _friendlyError(FirebaseAuthException e) { 
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Invalid email address.';
+      case 'user-disabled':
+        return 'This user has been disabled.';
+      case 'user-not-found':
+        return 'No user found with that email.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'email-already-in-use':
+        return 'Email already in use.';
+      case 'weak-password':
+        return 'Password is too weak.';
+      case 'operation-not-allowed':
+        return 'Email/password sign-in is disabled in Firebase Console.';
+      default:
+        return e.message ?? 'Unknown error.';
+    }
   }
 
   @override
@@ -102,20 +128,21 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Username field
+                  // Email
                   TextFormField(
-                    controller: _usernameController,
+                    controller: _emailController,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      labelText: 'Username',
-                      prefixIcon: Icon(Icons.person),
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.email),
                     ),
+                    keyboardType: TextInputType.emailAddress,
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a username';
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter an email';
                       }
-                      if (value.length < 3) {
-                        return 'Username must be at least 3 characters';
+                      if (!value.contains('@')) {
+                        return 'Please enter a valid email';
                       }
                       return null;
                     },
@@ -124,14 +151,18 @@ class _HomePageState extends State<HomePage> {
 
                   const SizedBox(height: 16),
 
-                  // Password field
+                  // Password
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                    obscureText: _obscure,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
                       labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock),
+                      prefixIcon: const Icon(Icons.lock),
+                      suffixIcon: IconButton(
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                        icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                      ),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -147,7 +178,7 @@ class _HomePageState extends State<HomePage> {
 
                   const SizedBox(height: 24),
 
-                  // Login button
+                  // Login
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -166,36 +197,21 @@ class _HomePageState extends State<HomePage> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Divider
                   Row(
                     children: const [
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'OR',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        child: Text('OR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
                       ),
                       Expanded(child: Divider()),
                     ],
@@ -203,7 +219,7 @@ class _HomePageState extends State<HomePage> {
 
                   const SizedBox(height: 16),
 
-                  // Create Account button
+                  // Create Account (quick sign-up)
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -216,35 +232,8 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Sign up text link
-                  TextButton(
-                    onPressed: _isLoading ? null : _handleCreateAccount,
-                    child: RichText(
-                      text: const TextSpan(
-                        style: TextStyle(color: Colors.grey),
-                        children: [
-                          TextSpan(text: "Don't have an account? "),
-                          TextSpan(
-                            text: "Sign up here",
-                            style: TextStyle(
-                              color: Color(0xFFFC3B3C),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: const Text('Create Account',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
