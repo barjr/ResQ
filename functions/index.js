@@ -30,3 +30,35 @@ setGlobalOptions({ maxInstances: 10 });
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+admin.initializeApp();
+
+/**
+ * Callable: setRole({ uid, role })
+ * Only callable by an existing admin.
+ */
+exports.setRole = functions.https.onCall(async (data, context) => {
+  // Must be signed in and an admin
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Sign in required.');
+  }
+  const callerRole = context.auth.token.role;
+  if (callerRole !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Admins only.');
+  }
+
+  const { uid, role } = data;
+  const allowed = ['admin', 'helper', 'user'];
+  if (!uid || !allowed.includes(role)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Provide uid and a valid role.');
+  }
+
+  // Set custom claim
+  await admin.auth().setCustomUserClaims(uid, { role });
+
+  // Force the user’s token to refresh on next sign-in
+  await admin.auth().revokeRefreshTokens(uid);
+
+  return { ok: true, roleSet: role };
+});
