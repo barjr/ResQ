@@ -7,9 +7,9 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+// const {setGlobalOptions} = require("firebase-functions");
+// const {onRequest} = require("firebase-functions/https");
+// const logger = require("firebase-functions/logger");
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -21,7 +21,7 @@ const logger = require("firebase-functions/logger");
 // functions should each use functions.runWith({ maxInstances: 10 }) instead.
 // In the v1 API, each function can only serve one request per container, so
 // this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+// setGlobalOptions({maxInstances: 10});
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started
@@ -30,8 +30,11 @@ setGlobalOptions({ maxInstances: 10 });
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+"use strict";
+
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+
 admin.initializeApp();
 
 /**
@@ -39,26 +42,34 @@ admin.initializeApp();
  * Only callable by an existing admin.
  */
 exports.setRole = functions.https.onCall(async (data, context) => {
-  // Must be signed in and an admin
+  // Must be signed in
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Sign in required.');
+    throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Sign in required.",
+    );
   }
+
   const callerRole = context.auth.token.role;
-  if (callerRole !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Admins only.');
+  if (callerRole !== "admin") {
+    throw new functions.https.HttpsError(
+        "permission-denied",
+        "Admins only.",
+    );
   }
 
-  const { uid, role } = data;
-  const allowed = ['admin', 'helper', 'user'];
+  const {uid, role} = data;
+  const allowed = ["admin", "helper", "user"];
+
   if (!uid || !allowed.includes(role)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Provide uid and a valid role.');
+    throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Provide uid and a valid role.",
+    );
   }
 
-  // Set custom claim
-  await admin.auth().setCustomUserClaims(uid, { role });
-
-  // Force the user’s token to refresh on next sign-in
+  await admin.auth().setCustomUserClaims(uid, {role: role});
   await admin.auth().revokeRefreshTokens(uid);
 
-  return { ok: true, roleSet: role };
+  return {ok: true, roleSet: role};
 });
