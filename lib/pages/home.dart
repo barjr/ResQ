@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:resq/pages/create_account.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -53,7 +54,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _handleCreateAccount() async {
+ /* Future<void> _handleCreateAccount() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
@@ -82,7 +83,8 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
+  } */
+
 //TODO: boilerplate, change for security 
   String _friendlyError(FirebaseAuthException e) { 
     switch (e.code) {
@@ -224,7 +226,13 @@ class _HomePageState extends State<HomePage> {
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton(
-                      onPressed: _isLoading ? null : _handleCreateAccount,
+                      onPressed: _isLoading
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const CreateAccountPage()),
+                            );
+                          },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFFFC3B3C)),
                         foregroundColor: const Color(0xFFFC3B3C),
