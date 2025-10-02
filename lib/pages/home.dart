@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:resq/pages/create_account.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,27 +34,27 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login successful!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Login successful!')));
       // No need to navigate; AuthGate will rebuild to Dashboard
     } on FirebaseAuthException catch (e) {
       final msg = _friendlyError(e);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $msg')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: $msg')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _handleCreateAccount() async {
+  /* Future<void> _handleCreateAccount() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
@@ -82,9 +83,10 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-//TODO: boilerplate, change for security 
-  String _friendlyError(FirebaseAuthException e) { 
+  } */
+
+  //TODO: boilerplate, change for security
+  String _friendlyError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':
         return 'Invalid email address.';
@@ -128,6 +130,12 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Icon(
+                    Icons.health_and_safety,
+                    size: 100,
+                    color: Color(0xFFFC3B3C),
+                  ),
+                  SizedBox(height: 75),
                   // Email
                   TextFormField(
                     controller: _emailController,
@@ -161,7 +169,9 @@ class _HomePageState extends State<HomePage> {
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
                         onPressed: () => setState(() => _obscure = !_obscure),
-                        icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(
+                          _obscure ? Icons.visibility : Icons.visibility_off,
+                        ),
                       ),
                     ),
                     validator: (value) {
@@ -197,10 +207,18 @@ class _HomePageState extends State<HomePage> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
-                          : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'Login',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
 
@@ -211,7 +229,13 @@ class _HomePageState extends State<HomePage> {
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+                        child: Text(
+                          'OR',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                       Expanded(child: Divider()),
                     ],
@@ -224,7 +248,15 @@ class _HomePageState extends State<HomePage> {
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton(
-                      onPressed: _isLoading ? null : _handleCreateAccount,
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const CreateAccountPage(),
+                                ),
+                              );
+                            },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFFFC3B3C)),
                         foregroundColor: const Color(0xFFFC3B3C),
@@ -232,8 +264,13 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('Create Account',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Create Account',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
