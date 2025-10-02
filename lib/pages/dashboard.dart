@@ -16,14 +16,28 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedIndex = index;
     });
     if (index == 1) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(title: const Text('Settings')),
-            body: const Center(child: Text('Settings Page')),
-          ),
-        ),
-      );
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => Scaffold(
+                appBar: AppBar(
+                  title: const Text('Settings'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+                body: const Center(child: Text('Settings Page coming soon')),
+              ),
+            ),
+          )
+          .then((_) {
+            setState(() {
+              _selectedIndex = 0;
+            });
+          });
     }
   }
 
@@ -44,10 +58,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               TextSpan(
-                text: user != null &&
-                    user.email != null &&
-                    user.email!.isNotEmpty &&
-                    user.email!.contains('@')
+                text:
+                    user != null &&
+                        user.email != null &&
+                        user.email!.isNotEmpty &&
+                        user.email!.contains('@')
                     ? user.email!.split('@')[0]
                     : '',
                 style: const TextStyle(
@@ -71,7 +86,9 @@ class _DashboardPageState extends State<DashboardPage> {
       body: Align(
         alignment: Alignment.topCenter,
         child: Padding(
-          padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).size.height * 0.1,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -84,7 +101,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 "If so, please press the button below.",
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
-              SizedBox(height: 24),
+              SizedBox(height: 50),
               TextButton(
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.red,
