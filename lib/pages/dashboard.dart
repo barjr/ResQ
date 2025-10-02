@@ -16,7 +16,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _selectedIndex = index;
     });
     if (index == 1) {
-      Navigator.of(context)
+      (Navigator.of(context)
           .push(
             MaterialPageRoute(
               builder: (_) => Scaffold(
@@ -29,7 +29,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     },
                   ),
                 ),
-                body: const Center(child: Text('Settings Page coming soon')),
+                body: const Center(
+                  child: Text(
+                    'Under construction :(',
+                    style: TextStyle(fontSize: 30),
+                  ),
+                ),
               ),
             ),
           )
@@ -37,7 +42,7 @@ class _DashboardPageState extends State<DashboardPage> {
             setState(() {
               _selectedIndex = 0;
             });
-          });
+          }));
     }
   }
 
