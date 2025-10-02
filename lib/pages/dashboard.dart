@@ -44,7 +44,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               TextSpan(
-                text: user != null && user.email != null
+                text: user != null &&
+                    user.email != null &&
+                    user.email!.isNotEmpty &&
+                    user.email!.contains('@')
                     ? user.email!.split('@')[0]
                     : '',
                 style: const TextStyle(
