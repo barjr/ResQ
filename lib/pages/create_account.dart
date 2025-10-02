@@ -2,6 +2,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// Error message helper (copied from home.dart)
+String _friendlyError(dynamic e) {
+  if (e is Exception && e.toString().contains('email-already-in-use')) {
+    return 'Email already in use.';
+  }
+  if (e is Exception && e.toString().contains('invalid-email')) {
+    return 'Invalid email address.';
+  }
+  if (e is Exception && e.toString().contains('weak-password')) {
+    return 'Password is too weak.';
+  }
+  if (e is Exception && e.toString().contains('operation-not-allowed')) {
+    return 'Email/password sign-in is disabled.';
+  }
+  if (e is Exception && e.toString().contains('user-disabled')) {
+    return 'This user has been disabled.';
+  }
+  return e is Exception
+      ? e.toString().replaceFirst('Exception: ', '')
+      : 'Unknown error.';
+}
+
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
 
@@ -60,17 +82,20 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   }
 
   // Validators
-  String? _req(String? v) => (v == null || v.trim().isEmpty) ? 'Required' : null;
+  String? _req(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'Required' : null;
   String? _email(String? v) {
     if ((v == null || v.isEmpty)) return 'Required';
     final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v);
-    return ok ? null : 'Enter a valid email';
+    return ok ? null : 'Enter a valid email (e.g. user@example.com)';
   }
 
   String? _phone(String? v) {
     if ((v == null || v.isEmpty)) return 'Required';
     final digits = v.replaceAll(RegExp(r'\D'), '');
-    return digits.length == 10 ? null : 'Enter a 10-digit phone';
+    return digits.length == 10
+        ? null
+        : 'Enter a 10-digit phone (e.g. 555-123-4567)';
   }
 
   String? _password(String? v) {
@@ -115,7 +140,10 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -128,9 +156,12 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     if (_isBystander) {
       if (_certIssuerCtrl.text.trim().isEmpty ||
           _certExpiresOn == null ||
-          (_uploadedCertPlaceholder == null || _uploadedCertPlaceholder!.isEmpty)) {
+          (_uploadedCertPlaceholder == null ||
+              _uploadedCertPlaceholder!.isEmpty)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please complete all bystander fields.')),
+          const SnackBar(
+            content: Text('Please complete all bystander fields.'),
+          ),
         );
         return;
       }
@@ -138,58 +169,67 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     if (_addMedicalProfile && !_consentMedicalAccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please allow medical profile access for emergencies or uncheck the profile.'),
+          content: Text(
+            'Please allow medical profile access for emergencies or uncheck the profile.',
+          ),
         ),
       );
       return;
     }
 
-    // Payload (placeholder for backend)
-    final payload = {
-      'auth': {'email': _emailCtrl.text.trim()},
-      'profile': {
-        'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
-        'dob': _dobCtrl.text.trim(),
-        'emergencyContact': {
-          'name': _ecNameCtrl.text.trim(),
-          'phone': _ecPhoneCtrl.text.trim(),
+    try {
+      // Payload (placeholder for backend)
+      final payload = {
+        'auth': {'email': _emailCtrl.text.trim()},
+        'profile': {
+          'name': _nameCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
+          'dob': _dobCtrl.text.trim(),
+          'emergencyContact': {
+            'name': _ecNameCtrl.text.trim(),
+            'phone': _ecPhoneCtrl.text.trim(),
+          },
+          'medicalId': _medicalIdCtrl.text.trim().isEmpty
+              ? null
+              : _medicalIdCtrl.text.trim(),
+          'role': 'attendee',
+          'isBystander': _isBystander,
         },
-        'medicalId': _medicalIdCtrl.text.trim().isEmpty ? null : _medicalIdCtrl.text.trim(),
-        'role': 'attendee',
-        'isBystander': _isBystander,
-      },
-    };
-    debugPrint('CreateAccount payload: $payload');
+      };
+      debugPrint('CreateAccount payload: $payload');
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Account Created'),
-        content: const Text('Your info looks good. You will be taken back.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // close dialog
-              Navigator.pop(context); // back to Home
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Account Created'),
+          content: const Text('Your info looks good. You will be taken back.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // close dialog
+                Navigator.pop(context); // back to Home
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      final msg = _friendlyError(e);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Account creation failed: $msg')));
+    }
   }
 
   InputDecoration _dec(String label, {bool required = false}) {
-    return InputDecoration(
-      labelText: required ? '$label *' : label,
-    );
+    return InputDecoration(labelText: required ? '$label *' : label);
   }
 
   Widget _sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-        child: Text(text, style: Theme.of(context).textTheme.titleMedium),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+  );
 
   Widget _whatsThis(String title, String message) {
     return Align(
@@ -210,7 +250,14 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create your ResQ account')),
+      appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
+        backgroundColor: Color(0xFFFC3B3C),
+        title: Text(
+          'Create your ResQ account',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -220,9 +267,14 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Fields marked with * are required.',
-                    style: TextStyle(fontStyle: FontStyle.italic),
+                  Center(
+                    child: const Text(
+                      'Fields marked with * are required.',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ),
 
                   _sectionTitle('Authentication'),
@@ -232,15 +284,12 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     decoration: _dec('Email', required: true),
                     validator: _email,
                   ),
-                  _whatsThis('Email', 'We’ll use this to sign you in and send important updates.'),
-
                   TextFormField(
                     controller: _passwordCtrl,
                     obscureText: true,
                     decoration: _dec('Password', required: true),
                     validator: _password,
                   ),
-                  _whatsThis('Password', 'At least 8 characters. Use a mix of letters, numbers, and symbols.'),
 
                   TextFormField(
                     controller: _confirmCtrl,
@@ -255,16 +304,18 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     decoration: _dec('Full Name', required: true),
                     validator: _req,
                   ),
-                  _whatsThis('Full Name', 'Your legal or preferred name. Used for your profile and responder info.'),
 
                   TextFormField(
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\-\(\)\s]'))],
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[0-9\-\(\)\s]'),
+                      ),
+                    ],
                     decoration: _dec('Phone Number', required: true),
                     validator: _phone,
                   ),
-                  _whatsThis('Phone Number', 'Needed for SMS alerts or as backup contact. Format: XXX-XXX-XXXX.'),
 
                   GestureDetector(
                     onTap: _pickDob,
@@ -276,7 +327,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                       ),
                     ),
                   ),
-                  _whatsThis('Date of Birth', 'Helps responders understand age-related health factors.'),
 
                   TextFormField(
                     controller: _ecNameCtrl,
@@ -286,7 +336,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                   TextFormField(
                     controller: _ecPhoneCtrl,
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\-\(\)\s\.]'))],
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[0-9\-\(\)\s\.]'),
+                      ),
+                    ],
                     decoration: _dec('Emergency Contact Phone', required: true),
                     validator: _phone,
                   ),
@@ -297,7 +351,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     maxLength: 15,
                     decoration: _dec('Medical ID'),
                   ),
-                  _whatsThis('Medical ID', 'If you already have a Medical ID from a hospital, doctor, or medical bracelet, enter it here. Otherwise leave blank.'),
 
                   _sectionTitle('Bystander Certification (optional)'),
                   SwitchListTile(
@@ -317,9 +370,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(_certExpiresOn == null
-                          ? 'Expiration Date *'
-                          : 'Expiration Date * — ${_fmtDate(_certExpiresOn!)}'),
+                      title: Text(
+                        _certExpiresOn == null
+                            ? 'Expiration Date *'
+                            : 'Expiration Date * — ${_fmtDate(_certExpiresOn!)}',
+                      ),
                       trailing: OutlinedButton(
                         onPressed: _pickCertExpiry,
                         child: const Text('Pick date'),
@@ -327,15 +382,18 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(_uploadedCertPlaceholder == null
-                          ? 'Upload Document *'
-                          : 'Uploaded: $_uploadedCertPlaceholder'),
+                      title: Text(
+                        _uploadedCertPlaceholder == null
+                            ? 'Upload Document *'
+                            : 'Uploaded: $_uploadedCertPlaceholder',
+                      ),
                       trailing: OutlinedButton(
-                        onPressed: () => setState(() => _uploadedCertPlaceholder = 'certification.pdf'),
+                        onPressed: () => setState(
+                          () => _uploadedCertPlaceholder = 'certification.pdf',
+                        ),
                         child: const Text('Choose file'),
                       ),
                     ),
-                    _whatsThis('Bystander Certification', 'Upload a photo or PDF of your certification card or document.'),
                   ],
 
                   _sectionTitle('Medical Profile (optional)'),
@@ -345,17 +403,26 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     onChanged: (v) => setState(() => _addMedicalProfile = v),
                   ),
                   if (_addMedicalProfile) ...[
-                    TextFormField(controller: _allergiesCtrl, decoration: _dec('Allergies (comma-separated)')),
-                    _whatsThis('Allergies', 'Examples: Peanuts, Latex.'),
-                    TextFormField(controller: _conditionsCtrl, decoration: _dec('Conditions (comma-separated)')),
-                    _whatsThis('Conditions', 'Examples: Asthma, Diabetes.'),
-                    TextFormField(controller: _medicationsCtrl, decoration: _dec('Medications (comma-separated)')),
-                    _whatsThis('Medications', 'Examples: Insulin, Epipen.'),
+                    TextFormField(
+                      controller: _allergiesCtrl,
+                      decoration: _dec('Allergies (comma-separated)'),
+                    ),
+                    TextFormField(
+                      controller: _conditionsCtrl,
+                      decoration: _dec('Conditions (comma-separated)'),
+                    ),
+                    TextFormField(
+                      controller: _medicationsCtrl,
+                      decoration: _dec('Medications (comma-separated)'),
+                    ),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: _consentMedicalAccess,
-                      onChanged: (v) => setState(() => _consentMedicalAccess = v ?? false),
-                      title: const Text('Allow responders to view my medical profile during emergencies'),
+                      onChanged: (v) =>
+                          setState(() => _consentMedicalAccess = v ?? false),
+                      title: const Text(
+                        'Allow responders to view my medical profile during emergencies',
+                      ),
                     ),
                   ],
 
