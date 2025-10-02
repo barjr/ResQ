@@ -338,7 +338,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
-                        RegExp(r'[0-9\-\(\)\s\.]'),
+                        RegExp(r'[0-9\-\(\)\s]'),
                       ),
                     ],
                     decoration: _dec('Emergency Contact Phone', required: true),
