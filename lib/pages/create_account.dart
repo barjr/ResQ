@@ -268,7 +268,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Center(
-                    child: const Text(
+                    child: Text(
                       'Fields marked with * are required.',
                       style: TextStyle(
                         fontStyle: FontStyle.italic,
