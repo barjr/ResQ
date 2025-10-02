@@ -260,7 +260,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                   TextFormField(
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\-\(\)\s\.]'))],
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9\-\(\)\s]'))],
                     decoration: _dec('Phone Number', required: true),
                     validator: _phone,
                   ),
