@@ -91,7 +91,27 @@ class _DashboardPageState extends State<DashboardPage> {
                     vertical: 16,
                   ),
                 ),
-                onPressed: () {},
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('SOS Feature'),
+                        content: const Text(
+                          'The SOS feature is not yet implemented.\nPlease contact emergency services directly if you are in danger.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
                 child: const Text("SOS", style: TextStyle(fontSize: 50)),
               ),
             ],
