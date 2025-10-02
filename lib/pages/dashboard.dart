@@ -71,7 +71,7 @@ class _DashboardPageState extends State<DashboardPage> {
       body: Align(
         alignment: Alignment.topCenter,
         child: Padding(
-          padding: EdgeInsets.only(top: 100.0),
+          padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.1),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
