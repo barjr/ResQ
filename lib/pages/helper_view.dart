@@ -61,7 +61,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Helper View', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFFFC3B3C),
       ),
