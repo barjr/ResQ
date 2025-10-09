@@ -9,7 +9,7 @@ class CustomerViewPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Customer View', style: TextStyle(color: Colors.white),),
         backgroundColor: const Color(0xFFFC3B3C),
       ),
