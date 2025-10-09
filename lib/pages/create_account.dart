@@ -133,21 +133,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   String _fmtDate(DateTime d) =>
       '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';
 
-  void _showInfo(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+  // removed unused helper that displayed an info dialog
 
   void _submit() {
     final valid = _formKey.currentState?.validate() ?? false;
@@ -231,21 +217,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     child: Text(text, style: Theme.of(context).textTheme.titleMedium),
   );
 
-  Widget _whatsThis(String title, String message) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton(
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(0, 30),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-        ),
-        onPressed: () => _showInfo(title, message),
-        child: const Text("What's this?"),
-      ),
-    );
-  }
+  // (removed unused helper method that showed contextual info buttons)
 
   @override
   Widget build(BuildContext context) {
