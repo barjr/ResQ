@@ -13,6 +13,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
+  bool _showDisclaimer = true;
 
   void _onNavTap(int index) {
     setState(() {
@@ -90,6 +91,11 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
         ],
+        bottom: _showDisclaimer
+          ? _DisclaimerAppBarBottom(
+              onClose: () => setState(() => _showDisclaimer = false),
+            )
+          : null,
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -172,3 +178,41 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 }
+
+class _DisclaimerAppBarBottom extends StatelessWidget implements PreferredSizeWidget {
+  final VoidCallback onClose;
+  const _DisclaimerAppBarBottom({required this.onClose});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(40);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFFFF8E1), // light amber
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'For educational purposes only — if this is a real emergency, call 911.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            iconSize: 18,
+            tooltip: 'Dismiss',
+            icon: const Icon(Icons.close),
+            onPressed: onClose,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
