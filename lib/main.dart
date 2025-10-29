@@ -5,20 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/pages/dashboard.dart';
-import 'package:resq/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  //Notification information
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-  notificationService.handleForegroundMessages();
-  notificationService.handleNotificationTaps();
-
   runApp(const MyApp());
 }
 
