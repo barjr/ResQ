@@ -3,6 +3,7 @@ import 'package:resq/services/summarizer.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:resq/models/help_request.dart' show Severity, Source;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SosReportPage extends StatefulWidget {
   const SosReportPage({super.key});
@@ -97,30 +98,74 @@ class _SosReportPageState extends State<SosReportPage> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
           ),
+          // TextButton(
+          //   onPressed: () {
+          //     Navigator.of(context).pop();
+          //     // persist to in-memory store so helpers can see the request
+          //     try {
+          //       // use a placeholder reporter name for now
+          //       RequestStore.instance.addRequest(
+          //         reporterName: 'Anonymous',
+          //         description: _descCtrl.text.trim(),
+          //         location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+          //       );
+          //     } catch (e) {
+          //       // ignore: avoid_print
+          //       print('Failed to add request: $e');
+          //     }
+          //     ScaffoldMessenger.of(context).showSnackBar(
+          //       const SnackBar(content: Text('Report submitted')), 
+          //     );
+          //     Navigator.of(context).pop();
+          //   },
+          //   child: const Text('Submit'),
+
           TextButton(
-            onPressed: () {
+            onPressed: () async {  // Add async here
               Navigator.of(context).pop();
-              // persist to in-memory store so helpers can see the request
+              
               try {
-                // use a placeholder reporter name for now
+                // Save to Firestore - this triggers the Cloud Function
+                await FirebaseFirestore.instance
+                  .collection('emergency_requests')
+                  .add({
+                    'reporterName': 'Anonymous',
+                    'description': _descCtrl.text.trim(),
+                    'location': _locationCtrl.text.trim().isEmpty 
+                      ? null 
+                      : _locationCtrl.text.trim(),
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'status': 'pending',
+                  });
+                
+                // Still add to in-memory store for local use
                 RequestStore.instance.addRequest(
                   reporterName: 'Anonymous',
                   description: _descCtrl.text.trim(),
                   location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
                   source: Source.sos,                // Mark SOS path
                   severity: Severity.critical,       // Enforce Critical for SOS
+                  location: _locationCtrl.text.trim().isEmpty 
+                    ? null 
+                    : _locationCtrl.text.trim(),
                 );
+                
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Emergency alert sent to helpers!')),
+                );
+                Navigator.of(context).pop();
               } catch (e) {
-                // ignore: avoid_print
-                print('Failed to add request: $e');
+                print('Failed to submit request: $e');
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Report submitted')), 
-              );
-              Navigator.of(context).pop();
             },
             child: const Text('Submit'),
           ),
+          //),
         ],
       ),
     );
