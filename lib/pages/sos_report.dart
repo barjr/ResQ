@@ -3,7 +3,7 @@ import 'package:resq/services/summarizer.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:resq/models/help_request.dart' show Severity, Source;
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Source;
 
 class SosReportPage extends StatefulWidget {
   const SosReportPage({super.key});
@@ -143,11 +143,8 @@ class _SosReportPageState extends State<SosReportPage> {
                   reporterName: 'Anonymous',
                   description: _descCtrl.text.trim(),
                   location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-                  source: Source.sos,                // Mark SOS path
+                  source: Source.sos,               // Mark SOS path
                   severity: Severity.critical,       // Enforce Critical for SOS
-                  location: _locationCtrl.text.trim().isEmpty 
-                    ? null 
-                    : _locationCtrl.text.trim(),
                 );
                 
                 if (!mounted) return;
