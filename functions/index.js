@@ -73,3 +73,63 @@ exports.setRole = functions.https.onCall(async (data, context) => {
 
   return {ok: true, roleSet: role};
 });
+
+/**
+ * Firestore Trigger: notifyHelpers
+ * Sends push notifications to all active helpers when a new emergency request is created
+ */
+exports.notifyHelpers = functions.firestore
+    .document("emergency_requests/{requestId}")
+    .onCreate(async (snap, context) => {
+      const request = snap.data();
+
+      // Get all active helpers with FCM tokens
+      const helpersSnapshot = await admin.firestore()
+          .collection("helpers")
+          .where("isActive", "==", true)
+          .get();
+
+      const tokens = [];
+      helpersSnapshot.forEach((doc) => {
+        const token = doc.data().fcmToken;
+        if (token) tokens.push(token);
+      });
+
+      if (tokens.length === 0) {
+        console.log("No helpers to notify");
+        return null;
+      }
+
+      // Create the notification message
+      const description = request.description || "Emergency assistance needed";
+      const location = request.location || "Location not specified";
+
+      const message = {
+        notification: {
+          title: "🚨 Emergency Alert",
+          body: description.substring(0, 100) + (description.length > 100 ? "..." : ""),
+        },
+        data: {
+          requestId: context.params.requestId,
+          location: location,
+          type: "emergency",
+        },
+      };
+
+      // Send to all helper tokens
+      try {
+        const response = await admin.messaging().sendEachForMulticast({
+          tokens: tokens,
+          ...message,
+        });
+
+        console.log(`Successfully sent ${response.successCount} notifications`);
+        console.log(`Failed to send ${response.failureCount} notifications`);
+
+        return response;
+      } catch (error) {
+        console.error("Error sending notifications:", error);
+        return null;
+      }
+ 
+});
