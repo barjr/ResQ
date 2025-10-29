@@ -14,12 +14,16 @@ class RequestStore {
 
   Stream<List<HelpRequest>> get stream => _controller.stream;
 
-  void addRequest({required String reporterName, required String description, String? location}) {
+  void addRequest({required String reporterName, required String description, String? location, Severity severity = Severity.critical,
+  Source   source   = Source.sos,}) {
     final req = HelpRequest(
       id: _uuid.v4(),
       reporterName: reporterName,
       description: description,
       location: location,
+      severity: severity,
+      source: source,
+      createdAt: DateTime.now(),
     );
     _requests.insert(0, req);
     _controller.add(List.unmodifiable(_requests));

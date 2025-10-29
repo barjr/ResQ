@@ -133,8 +133,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   String _fmtDate(DateTime d) =>
       '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';
 
-  // removed unused helper that displayed an info dialog
-
   void _submit() {
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
@@ -208,24 +206,28 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     }
   }
 
-  InputDecoration _dec(String label, {bool required = false}) {
-    return InputDecoration(labelText: required ? '$label *' : label);
+  // InputDecoration helper with short, example-style hints
+  InputDecoration _dec(String label, {bool required = false, String? hint}) {
+    return InputDecoration(
+      labelText: required ? '$label *' : label,
+      hintText: hint,
+      // Keep hints readable but compact
+      hintStyle: const TextStyle(color: Colors.black54),
+    );
   }
 
   Widget _sectionTitle(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
-  );
-
-  // (removed unused helper method that showed contextual info buttons)
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+        child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
-        backgroundColor: Color(0xFFFC3B3C),
-        title: Text(
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: const Color(0xFFFC3B3C),
+        title: const Text(
           'Create your ResQ account',
           style: TextStyle(color: Colors.white),
         ),
@@ -239,7 +241,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
+                  const Center(
                     child: Text(
                       'Fields marked with * are required.',
                       style: TextStyle(
@@ -249,81 +251,77 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     ),
                   ),
 
+                  // AUTH
                   _sectionTitle('Authentication'),
                   TextFormField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: _dec('Email', required: true),
+                    decoration: _dec('Email', required: true, hint: 'e.g. name@example.com'),
                     validator: _email,
                   ),
                   TextFormField(
                     controller: _passwordCtrl,
                     obscureText: true,
-                    decoration: _dec('Password', required: true),
+                    decoration: _dec('Password', required: true, hint: '8+ characters'),
                     validator: _password,
                   ),
-
                   TextFormField(
                     controller: _confirmCtrl,
                     obscureText: true,
-                    decoration: _dec('Confirm Password', required: true),
+                    decoration: _dec('Confirm Password', required: true, hint: 'Retype password'),
                     validator: _confirm,
                   ),
 
+                  // PROFILE
                   _sectionTitle('Basic Profile'),
                   TextFormField(
                     controller: _nameCtrl,
-                    decoration: _dec('Full Name', required: true),
+                    decoration: _dec('Full Name', required: true, hint: 'e.g. Alex Johnson'),
                     validator: _req,
                   ),
-
                   TextFormField(
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'[0-9\-\(\)\s]'),
-                      ),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9\-\(\)\s]')),
                     ],
-                    decoration: _dec('Phone Number', required: true),
+                    decoration: _dec('Phone Number', required: true, hint: 'e.g. 555-123-4567'),
                     validator: _phone,
                   ),
-
                   GestureDetector(
                     onTap: _pickDob,
                     child: AbsorbPointer(
                       child: TextFormField(
                         controller: _dobCtrl,
-                        decoration: _dec('Date of Birth', required: true),
+                        decoration: _dec('Date of Birth', required: true, hint: 'MM/DD/YYYY'),
                         validator: _req,
                       ),
                     ),
                   ),
-
                   TextFormField(
                     controller: _ecNameCtrl,
-                    decoration: _dec('Emergency Contact Name', required: true),
+                    decoration: _dec('Emergency Contact Name', required: true, hint: 'e.g. Jamie Lee'),
                     validator: _req,
                   ),
                   TextFormField(
                     controller: _ecPhoneCtrl,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'[0-9\-\(\)\s]'),
-                      ),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9\-\(\)\s]')),
                     ],
-                    decoration: _dec('Emergency Contact Phone', required: true),
+                    decoration: _dec('Emergency Contact Phone', required: true, hint: 'e.g. 555-987-6543'),
                     validator: _phone,
                   ),
 
+                  // MEDICAL ID
                   _sectionTitle('Medical ID (optional)'),
                   TextFormField(
                     controller: _medicalIdCtrl,
                     maxLength: 15,
-                    decoration: _dec('Medical ID'),
+                    decoration: _dec('Medical ID', hint: 'Existing hospital/bracelet ID (leave blank if none)'),
                   ),
 
+                  // BYSTANDER
                   _sectionTitle('Bystander Certification (optional)'),
                   SwitchListTile(
                     title: const Text('I am CPR/First Aid certified'),
@@ -333,12 +331,12 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                   if (_isBystander) ...[
                     TextFormField(
                       controller: _certIssuerCtrl,
-                      decoration: _dec('Certification Issuer', required: true),
+                      decoration: _dec('Certification Issuer', required: true, hint: 'e.g. American Red Cross'),
                       validator: (v) => _isBystander ? _req(v) : null,
                     ),
                     TextFormField(
                       controller: _credentialIdCtrl,
-                      decoration: _dec('Credential ID (optional)'),
+                      decoration: _dec('Credential ID (optional)', hint: 'If provided on your card'),
                     ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -360,14 +358,13 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                             : 'Uploaded: $_uploadedCertPlaceholder',
                       ),
                       trailing: OutlinedButton(
-                        onPressed: () => setState(
-                          () => _uploadedCertPlaceholder = 'certification.pdf',
-                        ),
+                        onPressed: () => setState(() => _uploadedCertPlaceholder = 'certification.pdf'),
                         child: const Text('Choose file'),
                       ),
                     ),
                   ],
 
+                  // MEDICAL PROFILE
                   _sectionTitle('Medical Profile (optional)'),
                   SwitchListTile(
                     title: const Text('Add a medical profile for responders'),
@@ -377,27 +374,25 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                   if (_addMedicalProfile) ...[
                     TextFormField(
                       controller: _allergiesCtrl,
-                      decoration: _dec('Allergies (comma-separated)'),
+                      decoration: _dec('Allergies (comma-separated)', hint: 'e.g. Peanuts, Latex'),
                     ),
                     TextFormField(
                       controller: _conditionsCtrl,
-                      decoration: _dec('Conditions (comma-separated)'),
+                      decoration: _dec('Conditions (comma-separated)', hint: 'e.g. Asthma, Diabetes'),
                     ),
                     TextFormField(
                       controller: _medicationsCtrl,
-                      decoration: _dec('Medications (comma-separated)'),
+                      decoration: _dec('Medications (comma-separated)', hint: 'e.g. Insulin, Epipen'),
                     ),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: _consentMedicalAccess,
-                      onChanged: (v) =>
-                          setState(() => _consentMedicalAccess = v ?? false),
-                      title: const Text(
-                        'Allow responders to view my medical profile during emergencies',
-                      ),
+                      onChanged: (v) => setState(() => _consentMedicalAccess = v ?? false),
+                      title: const Text('Allow responders to view my medical profile during emergencies'),
                     ),
                   ],
 
+                  // CONSENTS
                   _sectionTitle('Consent & Privacy'),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
