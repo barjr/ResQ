@@ -51,7 +51,7 @@ class AuthGate extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final user = snap.data;
-        if (user == null) return const HomePage();     // your login screen
+        if (user == null) return const HomePage();
         return RoleRouter(user: user);                  // go route by role
       },
     );
