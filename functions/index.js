@@ -7,9 +7,9 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-// const {setGlobalOptions} = require("firebase-functions");
-// const {onRequest} = require("firebase-functions/https");
-// const logger = require("firebase-functions/logger");
+const {setGlobalOptions} = require("firebase-functions");
+const {onRequest} = require("firebase-functions/https");
+const logger = require("firebase-functions/logger");
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -49,6 +49,44 @@ exports.setRole = functions.https.onCall(async (data, context) => {
         "Sign in required.",
     );
   }
+  
+const db = admin.firestore();
+
+//ACCOUNTS CREATED DEFAULT TO USER
+exports.onAuthCreate = functions.auth.user().onCreate(async (user) => {
+  const uid = user.uid;
+  const email = user.email || null;
+  const name = user.displayName || null;
+
+  // Default everyone to "user" unless you set claims otherwise
+  await db.collection('users').doc(uid).set({
+    email,
+    name,
+    role: 'user',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+});
+//ALLOWS A SIGNED IN USER TO SET THEIR OWN ROLE
+exports.selfSetRole = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Sign in required.');
+  }
+  const { role } = data || {};
+  if (!['helper', 'user'].includes(role)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Role must be helper or user.');
+  }
+
+  const uid = context.auth.uid;
+
+  // Update custom claim
+  await admin.auth().setCustomUserClaims(uid, { role });
+  await admin.auth().revokeRefreshTokens(uid);
+
+  // Mirror to Firestore
+  await admin.firestore().collection('users').doc(uid).set({ role }, { merge: true });
+
+  return { ok: true, roleSet: role };
+});
 
   const callerRole = context.auth.token.role;
   if (callerRole !== "admin") {
@@ -73,6 +111,7 @@ exports.setRole = functions.https.onCall(async (data, context) => {
 
   return {ok: true, roleSet: role};
 });
+
 
 /**
  * Firestore Trigger: notifyHelpers
@@ -131,5 +170,10 @@ exports.notifyHelpers = functions.firestore
         console.error("Error sending notifications:", error);
         return null;
       }
+
+
+      
  
 });
+
+
