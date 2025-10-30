@@ -1,6 +1,12 @@
 // lib/pages/create_account.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:resq/pages/mfa_enrollment.dart';
+
+
 
 // Error message helper (copied from home.dart)
 String _friendlyError(dynamic e) {
@@ -82,6 +88,9 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   }
 
   // Validators
+
+  String _chosenRole = 'user';
+
   String? _req(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Required' : null;
   String? _email(String? v) {
@@ -133,78 +142,85 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   String _fmtDate(DateTime d) =>
       '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';
 
-  void _submit() {
-    final valid = _formKey.currentState?.validate() ?? false;
-    if (!valid) return;
+  Future<void> _submit() async {
+  final valid = _formKey.currentState?.validate() ?? false;
+  if (!valid) return;
 
-    if (_isBystander) {
-      if (_certIssuerCtrl.text.trim().isEmpty ||
-          _certExpiresOn == null ||
-          (_uploadedCertPlaceholder == null ||
-              _uploadedCertPlaceholder!.isEmpty)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please complete all bystander fields.'),
-          ),
-        );
-        return;
-      }
-    }
-    if (_addMedicalProfile && !_consentMedicalAccess) {
+  if (_isBystander) {
+    if (_certIssuerCtrl.text.trim().isEmpty ||
+        _certExpiresOn == null ||
+        (_uploadedCertPlaceholder == null || _uploadedCertPlaceholder!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please allow medical profile access for emergencies or uncheck the profile.',
-          ),
-        ),
+        const SnackBar(content: Text('Please complete all bystander fields.')),
       );
       return;
     }
-
-    try {
-      // Payload (placeholder for backend)
-      final payload = {
-        'auth': {'email': _emailCtrl.text.trim()},
-        'profile': {
-          'name': _nameCtrl.text.trim(),
-          'phone': _phoneCtrl.text.trim(),
-          'dob': _dobCtrl.text.trim(),
-          'emergencyContact': {
-            'name': _ecNameCtrl.text.trim(),
-            'phone': _ecPhoneCtrl.text.trim(),
-          },
-          'medicalId': _medicalIdCtrl.text.trim().isEmpty
-              ? null
-              : _medicalIdCtrl.text.trim(),
-          'role': 'attendee',
-          'isBystander': _isBystander,
-        },
-      };
-      debugPrint('CreateAccount payload: $payload');
-
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Account Created'),
-          content: const Text('Your info looks good. You will be taken back.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // close dialog
-                Navigator.pop(context); // back to Home
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      final msg = _friendlyError(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Account creation failed: $msg')));
-    }
   }
+  if (_addMedicalProfile && !_consentMedicalAccess) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please allow medical profile access or uncheck.')),
+    );
+    return;
+  }
+
+  try {
+    // 1) Create user
+    final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+    );
+    final user = cred.user!;
+    await user.updateDisplayName(_nameCtrl.text.trim());
+
+    // 2) Create/merge Firestore user doc (mirror)
+    final uid = user.uid;
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'email': _emailCtrl.text.trim(),
+      'name': _nameCtrl.text.trim(),
+      'phone': _phoneCtrl.text.trim(),
+      'dob': _dobCtrl.text.trim(),
+      'emergencyContact': {
+        'name': _ecNameCtrl.text.trim(),
+        'phone': _ecPhoneCtrl.text.trim(),
+      },
+      'medicalId': _medicalIdCtrl.text.trim().isEmpty ? null : _medicalIdCtrl.text.trim(),
+      'isBystander': _isBystander,
+      'role': _chosenRole, // mirror; source of truth is claim
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    // 3) If helper chosen, set claim via selfSetRole (user can opt-in)
+    if (_chosenRole == 'helper') {
+      final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
+      await callable.call({'role': 'helper'});
+    } else {
+      // Ensure claim is "user" (optional; usually defaults null and router treats as user)
+      final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
+      await callable.call({'role': 'user'});
+    }
+
+    // 4) Refresh token so RoleRouter immediately routes by claim
+    await user.getIdToken(true);
+
+    // 5) (Optional) Start MFA enrollment later when backend flips the switch
+    await MfaEnrollment.maybeStartAfterSignup(
+      context,
+      phoneRaw: _phoneCtrl.text.trim(),
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account created!')),
+    );
+    Navigator.pop(context); // back to Home; AuthGate/RoleRouter will take over
+  } catch (e) {
+    final msg = _friendlyError(e);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Account creation failed: $msg')),
+    );
+  }
+}
 
   // InputDecoration helper with short, example-style hints
   InputDecoration _dec(String label, {bool required = false, String? hint}) {
@@ -270,6 +286,31 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     obscureText: true,
                     decoration: _dec('Confirm Password', required: true, hint: 'Retype password'),
                     validator: _confirm,
+                  ),
+                  // Role choice
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text('Choose your role (you can change later)', style: Theme.of(context).textTheme.titleSmall),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: const Text('User'),
+                          value: 'user',
+                          groupValue: _chosenRole,
+                          onChanged: (v) => setState(() => _chosenRole = v ?? 'user'),
+                        ),
+                      ),
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: const Text('Helper'),
+                          value: 'helper',
+                          groupValue: _chosenRole,
+                          onChanged: (v) => setState(() => _chosenRole = v ?? 'user'),
+                        ),
+                      ),
+                    ],
                   ),
 
                   // PROFILE
