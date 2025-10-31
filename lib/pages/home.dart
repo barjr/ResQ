@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:resq/pages/create_account.dart';
+import 'package:resq/services/role_router.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,7 +38,10 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Login successful!')));
-      // No need to navigate; AuthGate will rebuild to Dashboard
+      // after successful signInWithEmailAndPassword:
+      final u = FirebaseAuth.instance.currentUser!;
+      await routeByRole(context, u);
+
     } on FirebaseAuthException catch (e) {
       final msg = _friendlyError(e);
       if (!mounted) return;

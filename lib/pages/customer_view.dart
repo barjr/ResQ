@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:resq/pages/home.dart';
 import 'package:resq/services/request_store.dart';
 
 class CustomerViewPage extends StatelessWidget {
@@ -10,8 +11,24 @@ class CustomerViewPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Customer View', style: TextStyle(color: Colors.white),),
+        title: const Text(
+          'Customer View',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFFFC3B3C),
+        actions: [
+          IconButton(
+            tooltip: 'Back to Home',
+            icon: const Icon(Icons.home),
+            onPressed: () {
+              // Navigates back to the HomePage and clears intermediate routes
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomePage()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -53,7 +70,7 @@ class CustomerViewPage extends StatelessWidget {
                             TextField(
                               controller: locCtrl,
                               decoration: const InputDecoration(
-                                labelText: 'Location (optional)'
+                                labelText: 'Location (optional)',
                               ),
                             ),
                           ],
@@ -66,16 +83,23 @@ class CustomerViewPage extends StatelessWidget {
                           TextButton(
                             onPressed: () {
                               final user = FirebaseAuth.instance.currentUser;
-                              final reporter = (user != null && user.email != null && user.email!.isNotEmpty)
-                                  ? user.email!.split('@')[0]
-                                  : 'Anonymous';
+                              final reporter =
+                                  (user != null && user.email != null && user.email!.isNotEmpty)
+                                      ? user.email!.split('@')[0]
+                                      : 'Anonymous';
                               RequestStore.instance.addRequest(
                                 reporterName: reporter,
-                                description: noteCtrl.text.trim().isEmpty ? 'Help requested' : noteCtrl.text.trim(),
-                                location: locCtrl.text.trim().isEmpty ? null : locCtrl.text.trim(),
+                                description: noteCtrl.text.trim().isEmpty
+                                    ? 'Help requested'
+                                    : noteCtrl.text.trim(),
+                                location: locCtrl.text.trim().isEmpty
+                                    ? null
+                                    : locCtrl.text.trim(),
                               );
                               Navigator.of(context).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request sent')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Request sent')),
+                              );
                             },
                             child: const Text('Send'),
                           ),
@@ -88,8 +112,11 @@ class CustomerViewPage extends StatelessWidget {
                   backgroundColor: const Color(0xFFFC3B3C),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                icon: const Icon(Icons.call, color: Colors.white,),
-                label: const Text('Request Help', style: TextStyle(fontSize: 18, color: Colors.white)),
+                icon: const Icon(Icons.call, color: Colors.white),
+                label: const Text(
+                  'Request Help',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
               ),
               const SizedBox(height: 24),
             ],
