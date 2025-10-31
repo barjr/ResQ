@@ -66,13 +66,13 @@ exports.selfSetRole = functions.https.onCall(async (data, context) => {
   if (!["helper", "user"].includes(role)) {
     throw new functions.https.HttpsError("invalid-argument", "Role must be helper or user.");
   }
-
   const uid = context.auth.uid;
 
+  // Set claim (no revoke here!)
   await admin.auth().setCustomUserClaims(uid, { role });
-  await admin.auth().revokeRefreshTokens(uid);
 
-  await db.collection("users").doc(uid).set({ role }, { merge: true });
+  // Mirror to Firestore for the admin list UI
+  await admin.firestore().collection("users").doc(uid).set({ role }, { merge: true });
 
   return { ok: true, roleSet: role };
 });
