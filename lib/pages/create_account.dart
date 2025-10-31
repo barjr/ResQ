@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:resq/pages/mfa_enrollment.dart';
+import 'package:resq/services/role_router.dart';
 
 final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
@@ -197,7 +198,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     try {
       final setRoleFn = _functions.httpsCallable('selfSetRole');
       await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
-      await user.getIdToken(true);                 // ⬅️ refresh so RoleRouter sees claim immediately
+      await user.getIdToken(true);     
+      final u = FirebaseAuth.instance.currentUser!;
+      await routeByRole(context, u);
+      return; // we’ve navigated; don’t fall through to Navigator.pop
+            // ⬅️ refresh so RoleRouter sees claim immediately
     } on FirebaseFunctionsException catch (e) {
       debugPrint('selfSetRole failed: ${e.code} ${e.message}');
       // Fallback: you’ll still route as default "user" (no claim) until admin fixes functions

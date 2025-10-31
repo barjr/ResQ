@@ -1,74 +1,113 @@
-import 'package:flutter/material.dart';
+// lib/services/role_router.dart
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:resq/pages/admin_view.dart';
 import 'package:resq/pages/customer_view.dart';
+import 'package:resq/pages/dashboard.dart';
 import 'package:resq/pages/helper_view.dart';
-import 'package:resq/pages/admin_view.dart'; // create if you haven’t
 
-class RoleRouter extends StatefulWidget {
+class RoleRouter extends StatelessWidget {
   final User user;
   const RoleRouter({super.key, required this.user});
 
-  @override
-  State<RoleRouter> createState() => _RoleRouterState();
-}
+  // Track which UIDs we've already forced a refresh for (avoid loops)
+  static final Set<String> _didForceRefresh = <String>{};
 
-class _RoleRouterState extends State<RoleRouter> {
-  String? _role;
-  bool _loading = true;
-  String? _error;
+  Future<String?> _readRoleOnce(User u) async {
+    // 1) Read claims as-is (no force)
+    final t1 = await u.getIdTokenResult();
+    final r1 = t1.claims?['role'];
+    if (r1 is String) return r1;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadRole();
-    // Also respond to subsequent token changes (e.g., role changed server-side)
-    FirebaseAuth.instance.idTokenChanges().listen((u) {
-      if (u == null) return;
-      _readRole(fromUser: u);
-    });
-  }
-
-  Future<void> _loadRole() async {
-    try {
-      // Force refresh once so brand-new roles appear immediately
-      await widget.user.getIdToken(true);
-      await _readRole(fromUser: widget.user);
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to load role: $e';
-        _loading = false;
-      });
+    // 2) If role missing and we haven't forced yet for this UID, force refresh once
+    if (!_didForceRefresh.contains(u.uid)) {
+      _didForceRefresh.add(u.uid);
+      await u.getIdToken(true); // force one time
+      final t2 = await u.getIdTokenResult();
+      final r2 = t2.claims?['role'];
+      if (r2 is String) return r2;
     }
+
+    // 3) Default: no role → treat as user
+    return null;
   }
 
-  Future<void> _readRole({required User fromUser}) async {
-    final idToken = await fromUser.getIdTokenResult();
-    final role = idToken.claims?['role'] as String?;
-    setState(() {
-      _role = role;
-      _loading = false;
-    });
-  }
+  
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_error != null) {
-      return Scaffold(body: Center(child: Text(_error!)));
-    }
+    // Listen only to *auth state* changes; avoid token-change loops
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final u = snap.data;
+        if (u == null) {
+          // Signed out — your app’s Home/Login
+          return const CustomerViewPage(); // or HomePage() if you prefer here
+        }
 
-    switch (_role) {
-      case 'admin':
-        return const AdminViewPage();
-      case 'helper':
-        return const HelperViewPage();
-      case 'user':
-      case null:
-      default:
-        // Default to customer/user experience if no role set
-        return const CustomerViewPage();
-    }
+        return FutureBuilder<String?>(
+          future: _readRoleOnce(u),
+          builder: (context, fsnap) {
+            if (fsnap.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            if (fsnap.hasError) {
+              return Scaffold(body: Center(child: Text('Error: ${fsnap.error}')));
+            }
+
+            final role = fsnap.data; // may be null
+            switch (role) {
+              case 'admin':
+                return const AdminViewPage();
+              case 'helper':
+                return const HelperViewPage();
+              case 'user':
+              case null:
+              default:
+                return const CustomerViewPage();
+            }
+          },
+        );
+      },
+    );
   }
+}
+
+Future<void> routeByRole(BuildContext context, User user) async {
+  await user.getIdToken(true);
+
+  String? role;
+  const tries = 8;           
+  for (var i = 0; i < tries; i++) {
+    final tok = await user.getIdTokenResult();
+    final r = tok.claims?['role'];
+    role = r is String ? r : null;
+    if (role != null) break;
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  Widget dest;
+  switch (role) {
+    case 'admin':
+      dest = const AdminViewPage();
+      break;
+    case 'helper':
+      dest = const HelperViewPage();
+      break;
+    case 'user':
+      dest = const DashboardPage();
+    case null:
+    default:
+      dest = const CustomerViewPage();
+  }
+
+  if (!context.mounted) return;
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => dest),
+    (route) => false,
+  );
 }
