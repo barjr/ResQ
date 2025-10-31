@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:resq/models/help_request.dart';
+import 'package:resq/pages/home.dart';
 import 'package:resq/services/request_store.dart';
 
 class HelperViewPage extends StatefulWidget {
@@ -64,6 +65,18 @@ class _HelperViewPageState extends State<HelperViewPage> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Helper View', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFFFC3B3C),
+        actions: [
+          IconButton(
+            tooltip: 'Back to Home',
+            icon: const Icon(Icons.home),
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomePage()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -93,10 +106,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFC3B3C),
                               ),
-                              child: const Text(
-                                'Accept',
-                                style: TextStyle(color: Colors.white),
-                              ),
+                              child: const Text('Accept', style: TextStyle(color: Colors.white)),
                             ),
                           );
                         },

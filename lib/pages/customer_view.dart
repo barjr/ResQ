@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:resq/pages/home.dart';
 import 'package:resq/services/request_store.dart';
-import 'package:resq/pages/home.dart'; // ✅ Import your HomePage
 
 class CustomerViewPage extends StatelessWidget {
   const CustomerViewPage({super.key});
