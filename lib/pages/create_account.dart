@@ -5,7 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:resq/pages/mfa_enrollment.dart';
-import 'package:resq/pages/home.dart';
+
+final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
 
 // Error message helper (copied from home.dart)
@@ -187,26 +188,22 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       'isBystander': _isBystander,
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
     //WAIT FOR FIREBASE
     final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
     await callable.call({'role': _chosenRole}); // 'helper' or 'user'
     await user.getIdToken(true); // refresh so RoleRouter sees it now
 
-
-    // 3) If helper chosen, set claim via selfSetRole (user can opt-in)
-    if (_chosenRole == 'helper') {
-      final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
-      await callable.call({'role': 'helper'});
-    } else {
-      // Ensure claim is "user" (optional; usually defaults null and router treats as user)
-      final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
-      await callable.call({'role': 'user'});
+    try {
+      final setRoleFn = _functions.httpsCallable('selfSetRole');
+      await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
+      await user.getIdToken(true);                 // ⬅️ refresh so RoleRouter sees claim immediately
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('selfSetRole failed: ${e.code} ${e.message}');
+      // Fallback: you’ll still route as default "user" (no claim) until admin fixes functions
     }
 
-    // 4) Refresh token so RoleRouter immediately routes by claim
-    await user.getIdToken(true);
-
-    // 5) (Optional) Start MFA enrollment later when backend flips the switch
+    // TODO MFA IMPLEMENTATION
     await MfaEnrollment.maybeStartAfterSignup(
       context,
       phoneRaw: _phoneCtrl.text.trim(),
