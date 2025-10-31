@@ -7,9 +7,9 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+//const {setGlobalOptions} = require("firebase-functions");
+//const {onRequest} = require("firebase-functions/https");
+//const logger = require("firebase-functions/logger");
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -32,148 +32,126 @@ const logger = require("firebase-functions/logger");
 // });
 "use strict";
 
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
-
-/**
- * Callable: setRole({ uid, role })
- * Only callable by an existing admin.
- */
-exports.setRole = functions.https.onCall(async (data, context) => {
-  // Must be signed in
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-        "unauthenticated",
-        "Sign in required.",
-    );
-  }
-  
 const db = admin.firestore();
 
-//ACCOUNTS CREATED DEFAULT TO USER
+/**
+ * Auth trigger: create a Firestore mirror doc with default role "user".
+ */
 exports.onAuthCreate = functions.auth.user().onCreate(async (user) => {
   const uid = user.uid;
   const email = user.email || null;
   const name = user.displayName || null;
 
-  // Default everyone to "user" unless you set claims otherwise
-  await db.collection('users').doc(uid).set({
+  await db.collection("users").doc(uid).set({
     email,
     name,
-    role: 'user',
+    role: "user", // mirror only; claims are the source of truth
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 });
-//ALLOWS A SIGNED IN USER TO SET THEIR OWN ROLE
+
+/**
+ * Callable: selfSetRole({ role })
+ * Signed-in user may set their own role to 'helper' or 'user' only.
+ */
 exports.selfSetRole = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Sign in required.');
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
   }
-  const { role } = data || {};
-  if (!['helper', 'user'].includes(role)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Role must be helper or user.');
+  const role = (data && data.role) || null;
+  if (!["helper", "user"].includes(role)) {
+    throw new functions.https.HttpsError("invalid-argument", "Role must be helper or user.");
   }
 
   const uid = context.auth.uid;
 
-  // Update custom claim
   await admin.auth().setCustomUserClaims(uid, { role });
   await admin.auth().revokeRefreshTokens(uid);
 
-  // Mirror to Firestore
-  await admin.firestore().collection('users').doc(uid).set({ role }, { merge: true });
+  await db.collection("users").doc(uid).set({ role }, { merge: true });
 
   return { ok: true, roleSet: role };
 });
 
+/**
+ * Callable: setRole({ uid, role })
+ * Admin-only: set anyone's role (admin/helper/user).
+ */
+exports.setRole = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
   const callerRole = context.auth.token.role;
   if (callerRole !== "admin") {
-    throw new functions.https.HttpsError(
-        "permission-denied",
-        "Admins only.",
-    );
+    throw new functions.https.HttpsError("permission-denied", "Admins only.");
   }
 
-  const {uid, role} = data;
+  const { uid, role } = data || {};
   const allowed = ["admin", "helper", "user"];
-
   if (!uid || !allowed.includes(role)) {
-    throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Provide uid and a valid role.",
-    );
+    throw new functions.https.HttpsError("invalid-argument", "Provide uid and a valid role.");
   }
 
-  await admin.auth().setCustomUserClaims(uid, {role: role});
+  await admin.auth().setCustomUserClaims(uid, { role });
   await admin.auth().revokeRefreshTokens(uid);
 
-  return {ok: true, roleSet: role};
-});
+  await db.collection("users").doc(uid).set({ role }, { merge: true });
 
+  return { ok: true, roleSet: role };
+});
 
 /**
  * Firestore Trigger: notifyHelpers
- * Sends push notifications to all active helpers when a new emergency request is created
  */
 exports.notifyHelpers = functions.firestore
-    .document("emergency_requests/{requestId}")
-    .onCreate(async (snap, context) => {
-      const request = snap.data();
+  .document("emergency_requests/{requestId}")
+  .onCreate(async (snap, context) => {
+    const request = snap.data();
 
-      // Get all active helpers with FCM tokens
-      const helpersSnapshot = await admin.firestore()
-          .collection("helpers")
-          .where("isActive", "==", true)
-          .get();
+    const helpersSnapshot = await db
+      .collection("helpers")
+      .where("isActive", "==", true)
+      .get();
 
-      const tokens = [];
-      helpersSnapshot.forEach((doc) => {
-        const token = doc.data().fcmToken;
-        if (token) tokens.push(token);
+    const tokens = [];
+    helpersSnapshot.forEach((doc) => {
+      const token = doc.data().fcmToken;
+      if (token) tokens.push(token);
+    });
+
+    if (tokens.length === 0) {
+      console.log("No helpers to notify");
+      return null;
+    }
+
+    const description = request.description || "Emergency assistance needed";
+    const location = request.location || "Location not specified";
+
+    const message = {
+      notification: {
+        title: "🚨 Emergency Alert",
+        body: description.substring(0, 100) + (description.length > 100 ? "..." : ""),
+      },
+      data: {
+        requestId: context.params.requestId,
+        location: location,
+        type: "emergency",
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast({
+        tokens,
+        ...message,
       });
-
-      if (tokens.length === 0) {
-        console.log("No helpers to notify");
-        return null;
-      }
-
-      // Create the notification message
-      const description = request.description || "Emergency assistance needed";
-      const location = request.location || "Location not specified";
-
-      const message = {
-        notification: {
-          title: "🚨 Emergency Alert",
-          body: description.substring(0, 100) + (description.length > 100 ? "..." : ""),
-        },
-        data: {
-          requestId: context.params.requestId,
-          location: location,
-          type: "emergency",
-        },
-      };
-
-      // Send to all helper tokens
-      try {
-        const response = await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
-          ...message,
-        });
-
-        console.log(`Successfully sent ${response.successCount} notifications`);
-        console.log(`Failed to send ${response.failureCount} notifications`);
-
-        return response;
-      } catch (error) {
-        console.error("Error sending notifications:", error);
-        return null;
-      }
-
-
-      
- 
-});
-
-
+      console.log(`Sent ${response.successCount}, failed ${response.failureCount}`);
+      return response;
+    } catch (err) {
+      console.error("Error sending notifications:", err);
+      return null;
+    }
+  });

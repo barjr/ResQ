@@ -13,7 +13,7 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('User granted permission');
+      print('User granted permission');//TODO dont call print in prod code. Use only for testing
     }
 
     // Get the FCM token for this device

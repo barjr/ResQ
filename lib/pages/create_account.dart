@@ -1,11 +1,11 @@
 // lib/pages/create_account.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:resq/pages/mfa_enrollment.dart';
-
+import 'package:resq/pages/home.dart';
 
 
 // Error message helper (copied from home.dart)
@@ -185,9 +185,13 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       },
       'medicalId': _medicalIdCtrl.text.trim().isEmpty ? null : _medicalIdCtrl.text.trim(),
       'isBystander': _isBystander,
-      'role': _chosenRole, // mirror; source of truth is claim
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    //WAIT FOR FIREBASE
+    final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
+    await callable.call({'role': _chosenRole}); // 'helper' or 'user'
+    await user.getIdToken(true); // refresh so RoleRouter sees it now
+
 
     // 3) If helper chosen, set claim via selfSetRole (user can opt-in)
     if (_chosenRole == 'helper') {
