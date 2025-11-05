@@ -190,35 +190,28 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    //WAIT FOR FIREBASE
-    final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
-    await callable.call({'role': _chosenRole}); // 'helper' or 'user'
-    await user.getIdToken(true); // refresh so RoleRouter sees it now
+    // 3) Set role (custom claim) once, then refresh token
+final setRoleFn = _functions.httpsCallable('selfSetRole');
+await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
+await user.getIdToken(true);
 
-    try {
-      final setRoleFn = _functions.httpsCallable('selfSetRole');
-      await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
-      await user.getIdToken(true);     
-      final u = FirebaseAuth.instance.currentUser!;
-      await routeByRole(context, u);
-      return; // we’ve navigated; don’t fall through to Navigator.pop
-            // ⬅️ refresh so RoleRouter sees claim immediately
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('selfSetRole failed: ${e.code} ${e.message}');
-      // Fallback: you’ll still route as default "user" (no claim) until admin fixes functions
-    }
+// 4) Enforce MFA enrollment right after sign-up (BEFORE routing)
+final ok = await MfaEnrollment.requireAndEnrollIfNeeded(
+  context,
+  user: user,
+  phoneHintRaw: _phoneCtrl.text.trim(),
+);
+if (!ok) {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('You can finish MFA later in Settings.')),
+  );
+}
 
-    // TODO MFA IMPLEMENTATION
-    await MfaEnrollment.maybeStartAfterSignup(
-      context,
-      phoneRaw: _phoneCtrl.text.trim(),
-    );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account created!')),
-    );
-    Navigator.pop(context); // back to Home; AuthGate/RoleRouter will take over
+// 5) Now route by role
+if (!mounted) return;
+await routeByRole(context, FirebaseAuth.instance.currentUser!);
+    
   } catch (e) {
     final msg = _friendlyError(e);
     if (!mounted) return;
@@ -227,7 +220,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     );
   }
 }
-
+//ends here
   // InputDecoration helper with short, example-style hints
   InputDecoration _dec(String label, {bool required = false, String? hint}) {
     return InputDecoration(
