@@ -194,10 +194,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     // don't use the BuildContext directly, but any UI/navigation that does
     // must only run when the State is still mounted to avoid using a
     // discarded context after async gaps.
-    final callable = FirebaseFunctions.instance.httpsCallable('selfSetRole');
-    await callable.call({'role': _chosenRole}); // 'helper' or 'user'
-    await user.getIdToken(true); // refresh so RoleRouter sees it now
-
     try {
       final setRoleFn = _functions.httpsCallable('selfSetRole');
       await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
