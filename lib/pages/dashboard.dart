@@ -40,7 +40,7 @@ class _DashboardPageState extends State<DashboardPage> {
     // Settings tab: this index corresponds to the Settings entry in the
     // bottom navigation bar. Note the actual index value depends on whether
     // `isAdmin` is set (Roles may insert at index 1).
-    if (index == 2) {
+    if (index == (widget.isAdmin ? 2 : 1)) {
       (Navigator.of(context)
           .push(
             MaterialPageRoute(
