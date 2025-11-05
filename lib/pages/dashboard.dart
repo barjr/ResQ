@@ -3,12 +3,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/pages/customer_view.dart';
 import 'package:resq/pages/helper_view.dart';
+import 'package:resq/pages/admin_view.dart';
 import 'package:resq/pages/sos_report.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart';
 
+// Dashboard: central landing page for signed-in users.
+// - Shows an SOS quick action and quick links to Customer/Helper views.
+// - When `isAdmin` is true the bottom navigation includes a "Roles" entry
+//   which opens the admin role-management view. This lets admins manage
+//   user roles while keeping them on the same overall dashboard UX.
+//
+// Notes for maintainers:
+// - Bottom nav ordering is dynamic: Home (0), Roles (1, only for admins),
+//   Settings (last). The tap handler (`_onNavTap`) relies on these indexes.
+// - Active emergencies are provided by `RequestStore.instance.stream` and
+//   rendered in a ListView; cancelling an emergency shows a SnackBar with
+//   an UNDO action which re-adds a request to the store.
+
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  final bool isAdmin;
+  const DashboardPage({super.key, this.isAdmin = false});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -22,7 +37,10 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 1) {
+    // Settings tab: this index corresponds to the Settings entry in the
+    // bottom navigation bar. Note the actual index value depends on whether
+    // `isAdmin` is set (Roles may insert at index 1).
+    if (index == 2) {
       (Navigator.of(context)
           .push(
             MaterialPageRoute(
@@ -50,6 +68,14 @@ class _DashboardPageState extends State<DashboardPage> {
               _selectedIndex = 0;
             });
           }));
+    }
+    // Roles tab for admins: when an admin taps the Roles tab (index 1)
+    // we push the `AdminViewPage` which contains the role-management UI.
+    // We then reset the selected index back to Home when the admin returns.
+    if (widget.isAdmin && index == 1) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AdminViewPage()),
+      ).then((_) => setState(() => _selectedIndex = 0));
     }
   }
 
@@ -179,21 +205,30 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: const Text('Helper View'),
               ),
               // --- Active Emergencies ------------------------------------------------------
+              // The list below is driven by `RequestStore.instance.stream`.
+              // Each HelpRequest is rendered as a ListTile. The cancel flow
+              // shows a confirmation dialog, removes the request from the
+              // store on confirmation, and displays a SnackBar with an
+              // UNDO action (which re-adds the request). Keep UI changes
+              // guarded with `context.mounted` to avoid operating on a
+              // disposed State after async gaps.
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 24),
                     const Align(
-                      alignment: Alignment.centerLeft,
+                      alignment: Alignment.center,
                       child: Text(
                         'Active Emergencies',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 23,
                           fontWeight: FontWeight.w600,
                         ),
+                        
                       ),
                     ),
+                    const Divider(height: 1,),
                     const SizedBox(height: 8),
 
                     // List takes the remaining space and scrolls
@@ -215,7 +250,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           return ListView.separated(
                             padding: EdgeInsets.zero,
                             itemCount: items.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const Divider(height: 1),
                             itemBuilder: (context, i) {
                               final r = items[i];
@@ -305,12 +340,23 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
+      // Bottom navigation
+      // Ordering rules:
+      // - Home is always present at index 0.
+      // - If `isAdmin` is true, Roles is inserted at index 1 and Settings
+      //   becomes the last item. The tap handler (`_onNavTap`) depends on
+      //   these indexes; update both locations when modifying the bar.
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onNavTap,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
+        items: <BottomNavigationBarItem>[
+          const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          if (widget.isAdmin)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.admin_panel_settings),
+              label: 'Roles',
+            ),
+          const BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Settings',
           ),
@@ -339,6 +385,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
+// Small disclaimer shown at the bottom of the AppBar. Kept as a separate
+// widget to keep the Dashboard build method compact. Implements
+// PreferredSizeWidget so it can be naturally supplied to AppBar.bottom.
 class _DisclaimerAppBarBottom extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onClose;
   const _DisclaimerAppBarBottom({required this.onClose});
@@ -361,6 +410,9 @@ class _DisclaimerAppBarBottom extends StatelessWidget implements PreferredSizeWi
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+          // Compact dismiss control — invokes the callback passed from the
+          // Dashboard to toggle visibility. Use a callback here instead of
+          // accessing parent state directly to keep the widget reusable.
           IconButton(
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
