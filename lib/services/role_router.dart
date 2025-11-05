@@ -1,7 +1,7 @@
 // lib/services/role_router.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:resq/pages/admin_view.dart';
+
 import 'package:resq/pages/customer_view.dart';
 import 'package:resq/pages/dashboard.dart';
 import 'package:resq/pages/helper_view.dart';
@@ -62,7 +62,7 @@ class RoleRouter extends StatelessWidget {
             final role = fsnap.data; // may be null
             switch (role) {
               case 'admin':
-                return const AdminViewPage();
+                return const DashboardPage(isAdmin: true);
               case 'helper':
                 return const HelperViewPage();
               case 'user':
@@ -93,13 +93,14 @@ Future<void> routeByRole(BuildContext context, User user) async {
   Widget dest;
   switch (role) {
     case 'admin':
-      dest = const AdminViewPage();
+      dest = const DashboardPage(isAdmin: true);
       break;
     case 'helper':
       dest = const HelperViewPage();
       break;
     case 'user':
-      dest = const DashboardPage();
+      dest = const CustomerViewPage();
+      break;
     case null:
     default:
       dest = const CustomerViewPage();

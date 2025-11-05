@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:resq/pages/home.dart';
 
 class AdminViewPage extends StatefulWidget {
   const AdminViewPage({super.key});
@@ -91,18 +90,6 @@ class _AdminViewPageState extends State<AdminViewPage> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Home',
-            icon: const Icon(Icons.home),
-            onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const HomePage()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
       ),
       backgroundColor: Colors.white,
       body: Column(
@@ -202,7 +189,7 @@ class _AdminViewPageState extends State<AdminViewPage> {
                       Expanded(
                         child: ListView.separated(
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_,_) => const Divider(height: 1),
                           itemBuilder: (context, i) {
                             final doc = filtered[i];
                             final uid = doc.id;
