@@ -225,7 +225,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           fontSize: 23,
                           fontWeight: FontWeight.w600,
                         ),
-                        
                       ),
                     ),
                     const Divider(height: 1,),
