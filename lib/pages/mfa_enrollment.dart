@@ -33,4 +33,8 @@ class MfaEnrollment {
     // User may have enrolled or canceled; check again
     return await hasAnyFactor(user);
   }
+
+  static Future<void> maybeStartAfterSignup(BuildContext context, {required String phoneRaw}) async {
+    // TODO Implement this <later>
+  }
 }
