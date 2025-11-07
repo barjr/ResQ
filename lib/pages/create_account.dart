@@ -188,30 +188,40 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       'medicalId': _medicalIdCtrl.text.trim().isEmpty ? null : _medicalIdCtrl.text.trim(),
       'isBystander': _isBystander,
       'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  }, SetOptions(merge: true));
 
-    // 3) Set role (custom claim) once, then refresh token
-final setRoleFn = _functions.httpsCallable('selfSetRole');
-await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
-await user.getIdToken(true);
+    // WAIT FOR FIREBASE: set role claim and refresh token. These operations
+    // don't use the BuildContext directly, but any UI/navigation that does
+    // must only run when the State is still mounted to avoid using a
+    // discarded context after async gaps.
+    try {
+      final setRoleFn = _functions.httpsCallable('selfSetRole');
+      await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
+      await user.getIdToken(true);
+      final u = FirebaseAuth.instance.currentUser!;
+      // routeByRole performs navigation using the BuildContext; ensure the
+      // widget is still mounted before calling it.
+      if (!mounted) return;
+      await routeByRole(context, u);
+      return; // we’ve navigated; don’t fall through to Navigator.pop
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('selfSetRole failed: ${e.code} ${e.message}');
+      // Fallback: you’ll still route as default "user" (no claim) until admin fixes functions
+    }
 
-// 4) Enforce MFA enrollment right after sign-up (BEFORE routing)
-final ok = await MfaEnrollment.requireAndEnrollIfNeeded(
-  context,
-  user: user,
-  phoneHintRaw: _phoneCtrl.text.trim(),
-);
-if (!ok) {
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('You can finish MFA later in Settings.')),
-  );
-}
+    // TODO MFA IMPLEMENTATION: only call enrollment when mounted.
+    if (mounted) {
+      await MfaEnrollment.maybeStartAfterSignup(
+        context,
+        phoneRaw: _phoneCtrl.text.trim(),
+      );
+    }
 
-// 5) Now route by role
-if (!mounted) return;
-await routeByRole(context, FirebaseAuth.instance.currentUser!);
-    
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account created!')),
+    );
+    Navigator.pop(context); // back to Home; AuthGate/RoleRouter will take over
   } catch (e) {
     final msg = _friendlyError(e);
     if (!mounted) return;
@@ -294,19 +304,31 @@ await routeByRole(context, FirebaseAuth.instance.currentUser!);
                   Row(
                     children: [
                       Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('User'),
-                          value: 'user',
-                          groupValue: _chosenRole,
-                          onChanged: (v) => setState(() => _chosenRole = v ?? 'user'),
+                        child: InkWell(
+                          onTap: () => setState(() => _chosenRole = 'user'),
+                          child: ListTile(
+                            title: const Text('User'),
+                            leading: Icon(
+                              _chosenRole == 'user'
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
                         ),
                       ),
                       Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Helper'),
-                          value: 'helper',
-                          groupValue: _chosenRole,
-                          onChanged: (v) => setState(() => _chosenRole = v ?? 'user'),
+                        child: InkWell(
+                          onTap: () => setState(() => _chosenRole = 'helper'),
+                          child: ListTile(
+                            title: const Text('Helper'),
+                            leading: Icon(
+                              _chosenRole == 'helper'
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ],

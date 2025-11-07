@@ -4,15 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
-import 'package:resq/pages/dashboard.dart';
 import 'package:resq/services/notification_service.dart';
 import 'package:resq/services/role_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   //Notification information
   final notificationService = NotificationService();
@@ -48,11 +45,13 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         final user = snap.data;
         if (user == null) return const HomePage();
-        return RoleRouter(user: user);                  // go route by role
+        return RoleRouter(user: user); // go route by role
       },
     );
   }
