@@ -156,18 +156,7 @@ class OfflineMedicalGuidesPage extends StatefulWidget {
 class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
   final List<Map<String, dynamic>> _allGuides = [
     {
-      'title': 'Epilepsy First Aid',
-      'imagePath': 'assets/images/epilepsy.jpg',
-      'steps': [
-        '1. Do not restrain the person\'s movements',
-        '2. Keep the person safe from harmful objects',
-        '3. When seizure ends, roll the person onto their side',
-        '4. If seizure lasts more than 5 minutes, call 911',
-        '5. Stay with them until ambulance arrives',
-      ],
-    },
-    {
-      'title': 'Stopping Bleeding',
+      'title': 'Bleeding/Blood',
       'imagePath': 'assets/images/bleeding.jpg',
       'steps': [
         '1. Determine the presence of consciousness and breathing',
@@ -179,7 +168,7 @@ class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
       ],
     },
     {
-      'title': 'Choking First Aid',
+      'title': 'Choking',
       'imagePath': 'assets/images/choking.jpg',
       'steps': [
         '1. Ask the person: "Are you choking?"',
@@ -212,6 +201,17 @@ class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
         'Dry skin',
         'Headache',
         'Rapid heartbeat',
+      ],
+    },
+    {
+      'title': 'Epilepsy',
+      'imagePath': 'assets/images/epilepsy.jpg',
+      'steps': [
+        '1. Do not restrain the person\'s movements',
+        '2. Keep the person safe from harmful objects',
+        '3. When seizure ends, roll the person onto their side',
+        '4. If seizure lasts more than 5 minutes, call 911',
+        '5. Stay with them until ambulance arrives',
       ],
     },
     {
@@ -258,7 +258,7 @@ class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Offline Medical Guides'),
+        title: const Text('Offline Medical Guides', style: TextStyle(color: Colors.white),),
         backgroundColor: const Color(0xFFFC3B3C),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
