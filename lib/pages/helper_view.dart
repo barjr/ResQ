@@ -68,7 +68,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
         actions: [
           IconButton(
             tooltip: 'Back to Home',
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.home),
             onPressed: () {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const HomePage()),
