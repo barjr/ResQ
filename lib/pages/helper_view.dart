@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:resq/models/help_request.dart';
 import 'package:resq/pages/home.dart';
@@ -37,7 +36,9 @@ class _HelperViewPageState extends State<HelperViewPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Accept Request'),
-        content: Text('Accept request from ${req.reporterName}?'),
+        // ---------- Include severity in dialog text -------------------
+        content: Text('Accept ${_severityLabel(req.severity)} request from ${req.reporterName}?',),
+        // -------------------------------------------------------------------
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -99,6 +100,9 @@ class _HelperViewPageState extends State<HelperViewPage> {
                         itemBuilder: (context, index) {
                           final r = _requests[index];
                           return ListTile(
+                            // ---------- Show severity chip ---------------
+                            leading: _severityChip(r.severity),
+                            // ---------------------------------------------------
                             title: Text(r.reporterName),
                             subtitle: Text('${r.location ?? 'unknown location'} — ${r.description}'),
                             trailing: ElevatedButton(
@@ -118,4 +122,47 @@ class _HelperViewPageState extends State<HelperViewPage> {
       ),
     );
   }
+
+  // ---------- Severity label/chip helpers -------------------------------
+  String _severityLabel(Severity s) {
+    if (s == Severity.minor) return 'MINOR';
+    if (s == Severity.urgent) return 'URGENT';
+    if (s == Severity.critical) return 'CRITICAL';
+    return 'UNKNOWN';
+  }
+
+  Widget _severityChip(Severity s) {
+    final label = _severityLabel(s);
+
+    Color bg = const Color(0xFFE0E0E0);
+    Color fg = const Color(0xFF424242);
+    if (s == Severity.minor) {
+      bg = const Color(0xFFE8F5E9); // light green
+      fg = const Color(0xFF2E7D32);
+    } else if (s == Severity.urgent) {
+      bg = const Color(0xFFFFF3E0); // light orange
+      fg = const Color(0xFFEF6C00);
+    } else if (s == Severity.critical) {
+      bg = const Color(0xFFFFEBEE); // light red
+      fg = const Color(0xFFC62828);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
+  }
+  // ---------------------------------------------------------------------------
 }

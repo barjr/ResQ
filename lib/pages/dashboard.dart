@@ -7,6 +7,7 @@ import 'package:resq/pages/admin_view.dart';
 import 'package:resq/pages/sos_report.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart';
+import 'package:resq/pages/tiered_report.dart';
 
 // Dashboard: central landing page for signed-in users.
 // - Shows an SOS quick action and quick links to Customer/Helper views.
@@ -177,6 +178,20 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: const Text("SOS", style: TextStyle(fontSize: 50)),
               ),
               const SizedBox(height: 24),
+              // Not-SOS (Tiered Report) button
+              OutlinedButton.icon(
+                icon: const Icon(Icons.medical_services_outlined),
+                label: const Text('Get Help (Not SOS)'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TieredReportPage()),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).push(
@@ -204,6 +219,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: const Text('Helper View'),
               ),
+
               // --- Active Emergencies ------------------------------------------------------
               // The list below is driven by `RequestStore.instance.stream`.
               // Each HelpRequest is rendered as a ListTile. The cancel flow
@@ -255,6 +271,11 @@ class _DashboardPageState extends State<DashboardPage> {
                               final r = items[i];
                               return ListTile(
                                 contentPadding: EdgeInsets.zero,
+
+                                // ---------- Show severity chip ----------
+                                leading: _severityChip(r.severity),
+                                // ------------------------------------------------
+
                                 title: Text(
                                   _preview(r.description),
                                   style: const TextStyle(
@@ -311,12 +332,17 @@ class _DashboardPageState extends State<DashboardPage> {
                                           action: SnackBarAction(
                                             label: 'UNDO',
                                             onPressed: () {
+                                              // ---------- Restore full request ----------
                                               RequestStore.instance.addRequest(
                                                 description:
                                                     removed.description,
                                                 location: removed.location,
-                                                reporterName: 'Anonymous',
+                                                reporterName:
+                                                    removed.reporterName,
+                                                severity: removed.severity,
+                                                source: removed.source,
                                               );
+                                              // ------------------------------------------------
                                             },
                                           ),
                                         ),
@@ -364,6 +390,45 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // ---------- Severity chip helper --------------------------------------
+  Widget _severityChip(Severity s) {
+    String label = 'UNKNOWN';
+    Color bg = const Color(0xFFE0E0E0);
+    Color fg = const Color(0xFF424242);
+
+    if (s == Severity.minor) {
+      label = 'MINOR';
+      bg = const Color(0xFFE8F5E9); // light green
+      fg = const Color(0xFF2E7D32);
+    } else if (s == Severity.urgent) {
+      label = 'URGENT';
+      bg = const Color(0xFFFFF3E0); // light orange
+      fg = const Color(0xFFEF6C00);
+    } else if (s == Severity.critical) {
+      label = 'CRITICAL';
+      bg = const Color(0xFFFFEBEE); // light red
+      fg = const Color(0xFFC62828);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
+  }
+  // ---------------------------------------------------------------------------
+
   String _formatTime(DateTime dt) {
     // h:mm AM/PM without bringing in intl
     String two(int v) => v.toString().padLeft(2, '0');
@@ -373,11 +438,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   String _preview(String text, {int words = 8}) {
-    final tokens = text
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty)
-        .toList();
+    final tokens =
+        text.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     if (tokens.isEmpty) return '(No description)';
     final head = tokens.take(words).join(' ');
     return tokens.length > words ? '$head…' : head;
