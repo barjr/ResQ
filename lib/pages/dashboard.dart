@@ -192,6 +192,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     horizontal: 24,
                     vertical: 14,
                   ),
+                ),
+              ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).push(
