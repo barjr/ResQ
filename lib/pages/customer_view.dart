@@ -19,7 +19,7 @@ class CustomerViewPage extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Back to Home',
-            icon: const Icon(Icons.home),
+            icon: const Icon(Icons.logout),
             onPressed: () {
               // Navigates back to the HomePage and clears intermediate routes
               Navigator.of(context).pushAndRemoveUntil(
