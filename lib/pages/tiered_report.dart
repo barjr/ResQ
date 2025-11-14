@@ -3,6 +3,7 @@ import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart' show Severity, Source;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:resq/pages/sos_report.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Source;
 
 enum _LocalSeverity { minor, urgent, critical }
 
@@ -27,23 +28,22 @@ class _TieredReportPageState extends State<TieredReportPage> {
     super.dispose();
   }
 
-String _currentReporterName() {
-  final u = FirebaseAuth.instance.currentUser;
-  if (u == null) return 'Anonymous';
+  String _currentReporterName() {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return 'Anonymous';
 
-  final email = u.email;
-  if (email != null && email.contains('@')) {
-    return email.split('@').first; // e.g., "admin0"
+    final email = u.email;
+    if (email != null && email.contains('@')) {
+      return email.split('@').first; // e.g., "admin0"
+    }
+
+    final dn = u.displayName?.trim();
+    if (dn != null && dn.isNotEmpty) return dn;
+
+    // last-resort stable identifier
+    final uid = u.uid;
+    return uid.length > 6 ? uid.substring(0, 6) : uid;
   }
-
-  final dn = u.displayName?.trim();
-  if (dn != null && dn.isNotEmpty) return dn;
-
-  // last-resort stable identifier
-  final uid = u.uid;
-  return uid.length > 6 ? uid.substring(0, 6) : uid;
-}
-
 
   void _onSelect(_LocalSeverity sev) {
     setState(() => _selected = sev);
@@ -53,26 +53,50 @@ String _currentReporterName() {
     if (_selected == null || _selected == _LocalSeverity.critical) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final severity =
-        _selected == _LocalSeverity.minor ? Severity.minor : Severity.urgent;
+    final severity = _selected == _LocalSeverity.minor
+        ? Severity.minor
+        : Severity.urgent;
 
     final reporter = _currentReporterName();
 
-    RequestStore.instance.addRequest(
-      reporterName: reporter,
-      description: _descCtrl.text.trim(),
-      location: _locationCtrl.text.trim().isEmpty
-          ? null
-          : _locationCtrl.text.trim(),
-      severity: severity,
-      source: Source.report,
-    );
+    try {
+      // Persist to Firestore (so other devices/helpers see it)
+      await FirebaseFirestore.instance.collection('emergency_requests').add({
+        'reporterName': reporter,
+        'description': _descCtrl.text.trim(),
+        'location': _locationCtrl.text.trim().isEmpty
+            ? null
+            : _locationCtrl.text.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'severity': severity.name, // 'minor'|'urgent'
+        'source': 'report',
+      });
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Submitted as ${severity.name.toUpperCase()}')),
-    );
-    Navigator.of(context).pop();
+      // Still add to in-memory store for immediate local visibility
+      RequestStore.instance.addRequest(
+        reporterName: reporter,
+        description: _descCtrl.text.trim(),
+        location: _locationCtrl.text.trim().isEmpty
+            ? null
+            : _locationCtrl.text.trim(),
+        severity: severity,
+        source: Source.report,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Submitted as ${severity.name.toUpperCase()}')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to submit tiered report: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to submit: $e')));
+    }
   }
 
   @override
@@ -80,9 +104,7 @@ String _currentReporterName() {
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Get Help (Not SOS)'),
-      ),
+      appBar: AppBar(title: const Text('Get Help (Not SOS)')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -124,8 +146,10 @@ String _currentReporterName() {
           if (_selected == _LocalSeverity.urgent)
             Text('Dizziness, dehydration signs, sprain', style: t.bodySmall),
           if (_selected == _LocalSeverity.critical)
-            Text('Severe bleeding, unconscious, breathing trouble',
-                style: t.bodySmall),
+            Text(
+              'Severe bleeding, unconscious, breathing trouble',
+              style: t.bodySmall,
+            ),
 
           const SizedBox(height: 8),
           const Divider(),
@@ -139,8 +163,10 @@ String _currentReporterName() {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Tell us what’s wrong. This is not a panic alert.',
-                      style: t.bodyMedium),
+                  Text(
+                    'Tell us what’s wrong. This is not a panic alert.',
+                    style: t.bodyMedium,
+                  ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _descCtrl,
@@ -166,17 +192,20 @@ String _currentReporterName() {
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _submit,
-                    child: Text(_selected == _LocalSeverity.minor
-                        ? 'Submit as Minor'
-                        : 'Submit as Urgent'),
+                    child: Text(
+                      _selected == _LocalSeverity.minor
+                          ? 'Submit as Minor'
+                          : 'Submit as Urgent',
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       TextButton(
-                        onPressed: () => ScaffoldMessenger.of(context)
-                            .showSnackBar(const SnackBar(
-                                content: Text('Work in progress'))),
+                        onPressed: () =>
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Work in progress')),
+                            ),
                         child: const Text('Helpful Guides'),
                       ),
                       const Spacer(),

@@ -6,10 +6,15 @@ import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/services/notification_service.dart';
 import 'package:resq/services/role_router.dart';
+import 'package:resq/services/request_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Start syncing active emergency requests from Firestore into the
+  // in-memory RequestStore so dashboards update in real-time.
+  RequestStore.instance.startFirestoreSync();
 
   //Notification information
   final notificationService = NotificationService();

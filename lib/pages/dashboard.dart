@@ -24,7 +24,8 @@ import 'package:resq/pages/tiered_report.dart';
 
 class DashboardPage extends StatefulWidget {
   final bool isAdmin;
-  const DashboardPage({super.key, this.isAdmin = false});
+  final bool isHelper;
+  const DashboardPage({super.key, this.isAdmin = false, this.isHelper = false});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -74,15 +75,16 @@ class _DashboardPageState extends State<DashboardPage> {
     // we push the `AdminViewPage` which contains the role-management UI.
     // We then reset the selected index back to Home when the admin returns.
     if (widget.isAdmin && index == 1) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AdminViewPage()),
-      ).then((_) => setState(() => _selectedIndex = 0));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const AdminViewPage()))
+          .then((_) => setState(() => _selectedIndex = 0));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final bool isRegular = !widget.isAdmin && !widget.isHelper;
     return Scaffold(
       appBar: AppBar(
         title: Text.rich(
@@ -120,18 +122,18 @@ class _DashboardPageState extends State<DashboardPage> {
               try {
                 await FirebaseAuth.instance.signOut();
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Signed out')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Signed out')));
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const HomePage()),
                   (route) => false,
                 );
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Sign out failed: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Sign out failed: $e')));
               }
             },
           ),
@@ -151,217 +153,279 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             mainAxisSize: MainAxisSize.max,
             children: [
-              Text(
-                "Are you in an emergency?",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30),
-              ),
-              SizedBox(height: 16),
-              Text(
-                "If so, please press the button below.",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              SizedBox(height: 50),
-              TextButton(
-                style: TextButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
+              if (isRegular) ...[
+                Text(
+                  "Are you in an emergency?",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  "If so, please press the button below.",
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                SizedBox(height: 50),
+              ],
+
+              if (widget.isAdmin || isRegular) ...[
+                TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.all(15),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SosReportPage()),
+                    );
+                  },
+                  child: const Text("SOS", style: TextStyle(fontSize: 50)),
+                ),
+                const SizedBox(height: 24),
+                // Not-SOS (Tiered Report) button
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.medical_services_outlined),
+                  label: const Text('Get Help (Not SOS)'),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TieredReportPage(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SosReportPage()),
-                  );
-                },
-                child: const Text("SOS", style: TextStyle(fontSize: 50)),
-              ),
-              const SizedBox(height: 24),
-              // Not-SOS (Tiered Report) button
-              OutlinedButton.icon(
-                icon: const Icon(Icons.medical_services_outlined),
-                label: const Text('Get Help (Not SOS)'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TieredReportPage()),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 14,
+                SizedBox(height: 12),
+
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const OfflineMedicalGuidesPage(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFC3B3C),
+                    side: const BorderSide(color: Color(0xFFFC3B3C)),
+                    padding: const EdgeInsets.all(20),
+                  ),
+                  icon: const Icon(Icons.local_hospital),
+                  label: const Text(
+                    'View Offline Medical Guides',
+                    style: TextStyle(fontSize: 15),
                   ),
                 ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CustomerViewPage()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+
+                SizedBox(height: 12),
+                // Customer & Helper navigation buttons removed from the
+                // regular user view per product requirement. Regular users
+                // only see the emergency reporting buttons above.
+              ],
+
+              // Show Customer and Helper view buttons to admins/helpers only
+              if (!isRegular) ...[
+                // Customer view should be admin-only (helpers should not see it)
+                if (widget.isAdmin) ...[
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CustomerViewPage(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: const Text('Customer View'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Helper View available to helpers and admins
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HelperViewPage()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
+                  ),
+                  child: const Text('Helper View'),
                 ),
-                child: const Text('Customer View'),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HelperViewPage()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                ),
-                child: const Text('Helper View'),
-              ),
+              ],
 
               // --- Active Emergencies ------------------------------------------------------
-              // The list below is driven by `RequestStore.instance.stream`.
-              // Each HelpRequest is rendered as a ListTile. The cancel flow
-              // shows a confirmation dialog, removes the request from the
-              // store on confirmation, and displays a SnackBar with an
-              // UNDO action (which re-adds the request). Keep UI changes
-              // guarded with `context.mounted` to avoid operating on a
-              // disposed State after async gaps.
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 24),
-                    const Align(
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Active Emergencies',
-                        style: TextStyle(
-                          fontSize: 23,
-                          fontWeight: FontWeight.w600,
+              // Only show the active emergencies list to admins and helpers.
+              // Regular users do not need to see this section.
+              if (widget.isAdmin || widget.isHelper) ...[
+                // The list below is driven by `RequestStore.instance.stream`.
+                // Each HelpRequest is rendered as a ListTile. The cancel flow
+                // shows a confirmation dialog, removes the request from the
+                // store on confirmation, and displays a SnackBar with an
+                // UNDO action (which re-adds the request). Keep UI changes
+                // guarded with `context.mounted` to avoid operating on a
+                // disposed State after async gaps.
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 24),
+                      const Align(
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Active Emergencies',
+                          style: TextStyle(
+                            fontSize: 23,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    const Divider(height: 1,),
-                    const SizedBox(height: 8),
+                      const Divider(height: 1),
+                      const SizedBox(height: 8),
 
-                    // List takes the remaining space and scrolls
-                    Expanded(
-                      child: StreamBuilder<List<HelpRequest>>(
-                        stream: RequestStore.instance.stream,
-                        builder: (context, snapshot) {
-                          final items = snapshot.data ?? const <HelpRequest>[];
+                      // List takes the remaining space and scrolls
+                      Expanded(
+                        child: StreamBuilder<List<HelpRequest>>(
+                          stream: RequestStore.instance.stream,
+                          builder: (context, snapshot) {
+                            final items =
+                                snapshot.data ?? const <HelpRequest>[];
 
-                          if (items.isEmpty) {
-                            return Center(
-                              child: Text(
-                                'No active emergencies.',
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            );
-                          }
-
-                          return ListView.separated(
-                            padding: EdgeInsets.zero,
-                            itemCount: items.length,
-                            separatorBuilder: (_, _) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, i) {
-                              final r = items[i];
-                              return ListTile(
-                                contentPadding: EdgeInsets.zero,
-
-                                // ---------- Show severity chip ----------
-                                leading: _severityChip(r.severity),
-                                // ------------------------------------------------
-
-                                title: Text(
-                                  _preview(r.description),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: Text(
-                                    _formatTime(r.createdAt),
-                                    style: const TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                                trailing: TextButton(
-                                  onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (_) => AlertDialog(
-                                        title: const Text('Cancel emergency?'),
-                                        content: const Text(
-                                          'This will remove the emergency from your active list.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.of(
-                                              context,
-                                            ).pop(false),
-                                            child: const Text('No'),
-                                          ),
-                                          FilledButton(
-                                            style: FilledButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                            ),
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(true),
-                                            child: const Text('Yes, cancel'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (confirm == true) {
-                                      final removed = r;
-                                      RequestStore.instance.removeRequest(r.id);
-
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: const Text(
-                                            'Emergency canceled',
-                                          ),
-                                          action: SnackBarAction(
-                                            label: 'UNDO',
-                                            onPressed: () {
-                                              // ---------- Restore full request ----------
-                                              RequestStore.instance.addRequest(
-                                                description:
-                                                    removed.description,
-                                                location: removed.location,
-                                                reporterName:
-                                                    removed.reporterName,
-                                                severity: removed.severity,
-                                                source: removed.source,
-                                              );
-                                              // ------------------------------------------------
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  child: const Text('Cancel'),
+                            if (items.isEmpty) {
+                              return Center(
+                                child: Text(
+                                  'No active emergencies.',
+                                  style: TextStyle(color: Colors.grey[600]),
                                 ),
                               );
-                            },
-                          );
-                        },
+                            }
+
+                            return ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: items.length,
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, i) {
+                                final r = items[i];
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+
+                                  // ---------- Show severity chip ----------
+                                  leading: _severityChip(r.severity),
+
+                                  // ------------------------------------------------
+                                  title: Text(
+                                    _preview(r.description),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 2.0),
+                                    child: Text(
+                                      _formatTime(r.createdAt),
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                  trailing: TextButton(
+                                    onPressed: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: const Text(
+                                            'Cancel emergency?',
+                                          ),
+                                          content: const Text(
+                                            'This will remove the emergency from your active list.',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.of(
+                                                context,
+                                              ).pop(false),
+                                              child: const Text('No'),
+                                            ),
+                                            FilledButton(
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor: Colors.red,
+                                              ),
+                                              onPressed: () => Navigator.of(
+                                                context,
+                                              ).pop(true),
+                                              child: const Text('Yes, cancel'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (confirm == true) {
+                                        final removed = r;
+                                        RequestStore.instance.removeRequest(
+                                          r.id,
+                                        );
+
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: const Text(
+                                              'Emergency canceled',
+                                            ),
+                                            action: SnackBarAction(
+                                              label: 'UNDO',
+                                              onPressed: () {
+                                                // ---------- Restore full request ----------
+                                                RequestStore.instance
+                                                    .addRequest(
+                                                      description:
+                                                          removed.description,
+                                                      location:
+                                                          removed.location,
+                                                      reporterName:
+                                                          removed.reporterName,
+                                                      severity:
+                                                          removed.severity,
+                                                      source: removed.source,
+                                                    );
+                                                // ------------------------------------------------
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: const Text('Cancel'),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
               // --- /Active Emergencies -----------------------------------------------------
             ],
           ),
@@ -421,11 +485,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: fg,
-        ),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
       ),
     );
   }
@@ -440,8 +500,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   String _preview(String text, {int words = 8}) {
-    final tokens =
-        text.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    final tokens = text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
     if (tokens.isEmpty) return '(No description)';
     final head = tokens.take(words).join(' ');
     return tokens.length > words ? '$head…' : head;
@@ -451,7 +514,8 @@ class _DashboardPageState extends State<DashboardPage> {
 // Small disclaimer shown at the bottom of the AppBar. Kept as a separate
 // widget to keep the Dashboard build method compact. Implements
 // PreferredSizeWidget so it can be naturally supplied to AppBar.bottom.
-class _DisclaimerAppBarBottom extends StatelessWidget implements PreferredSizeWidget {
+class _DisclaimerAppBarBottom extends StatelessWidget
+    implements PreferredSizeWidget {
   final VoidCallback onClose;
   const _DisclaimerAppBarBottom({required this.onClose});
 

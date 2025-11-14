@@ -83,7 +83,10 @@ class CustomerViewPage extends StatelessWidget {
                           TextButton(
                             onPressed: () {
                               final user = FirebaseAuth.instance.currentUser;
-                              final reporter = (user != null && user.email != null && user.email!.isNotEmpty)
+                              final reporter =
+                                  (user != null &&
+                                      user.email != null &&
+                                      user.email!.isNotEmpty)
                                   ? user.email!.split('@')[0]
                                   : 'Anonymous';
                               RequestStore.instance.addRequest(
@@ -118,26 +121,6 @@ class CustomerViewPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const OfflineMedicalGuidesPage(),
-                    ),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFFC3B3C),
-                  side: const BorderSide(color: Color(0xFFFC3B3C)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                icon: const Icon(Icons.local_hospital),
-                label: const Text(
-                  'View Offline Medical Guides',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
             ],
           ),
         ),
@@ -150,7 +133,8 @@ class OfflineMedicalGuidesPage extends StatefulWidget {
   const OfflineMedicalGuidesPage({super.key});
 
   @override
-  State<OfflineMedicalGuidesPage> createState() => _OfflineMedicalGuidesPageState();
+  State<OfflineMedicalGuidesPage> createState() =>
+      _OfflineMedicalGuidesPageState();
 }
 
 class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
@@ -258,7 +242,10 @@ class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Offline Medical Guides', style: TextStyle(color: Colors.white),),
+        title: const Text(
+          'Offline Medical Guides',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFFFC3B3C),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -400,21 +387,20 @@ class _OfflineMedicalGuidesPageState extends State<OfflineMedicalGuidesPage> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          ...steps.map((step) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('• ', style: TextStyle(fontSize: 16)),
-                    Expanded(
-                      child: Text(
-                        step,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+          ...steps.map(
+            (step) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ', style: TextStyle(fontSize: 16)),
+                  Expanded(
+                    child: Text(step, style: const TextStyle(fontSize: 16)),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
