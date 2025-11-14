@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:resq/pages/mfa_enrollment.dart';
 import 'package:resq/services/role_router.dart';
+import 'package:resq/pages/verify_email.dart';
 
 final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
@@ -144,37 +145,44 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   String _fmtDate(DateTime d) =>
       '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';
 
-  Future<void> _submit() async {
+Future<void> _submit() async {
   final valid = _formKey.currentState?.validate() ?? false;
   if (!valid) return;
 
+  // Extra checks
   if (_isBystander) {
     if (_certIssuerCtrl.text.trim().isEmpty ||
         _certExpiresOn == null ||
-        (_uploadedCertPlaceholder == null || _uploadedCertPlaceholder!.isEmpty)) {
+        (_uploadedCertPlaceholder == null ||
+            _uploadedCertPlaceholder!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please complete all bystander fields.')),
       );
       return;
     }
   }
+
   if (_addMedicalProfile && !_consentMedicalAccess) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please allow medical profile access or uncheck.')),
+      const SnackBar(
+        content:
+            Text('Please allow medical profile access or uncheck the profile.'),
+      ),
     );
     return;
   }
 
   try {
-    // 1) Create user
-    final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    // 1) Create auth user
+    final cred = await FirebaseAuth.instance
+        .createUserWithEmailAndPassword(
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
     );
     final user = cred.user!;
     await user.updateDisplayName(_nameCtrl.text.trim());
 
-    // 2) Create/merge Firestore user doc (mirror)
+    // 2) Create/merge Firestore user doc
     final uid = user.uid;
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'email': _emailCtrl.text.trim(),
@@ -185,43 +193,58 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         'name': _ecNameCtrl.text.trim(),
         'phone': _ecPhoneCtrl.text.trim(),
       },
-      'medicalId': _medicalIdCtrl.text.trim().isEmpty ? null : _medicalIdCtrl.text.trim(),
+      'medicalId': _medicalIdCtrl.text.trim().isEmpty
+          ? null
+          : _medicalIdCtrl.text.trim(),
       'isBystander': _isBystander,
       'createdAt': FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true));
+    }, SetOptions(merge: true));
 
-    // WAIT FOR FIREBASE: set role claim and refresh token. These operations
-    // don't use the BuildContext directly, but any UI/navigation that does
-    // must only run when the State is still mounted to avoid using a
-    // discarded context after async gaps.
+    // 3) Best-effort: set initial role claim (helper/user)
     try {
       final setRoleFn = _functions.httpsCallable('selfSetRole');
       await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
-      await user.getIdToken(true);
-      final u = FirebaseAuth.instance.currentUser!;
-      // routeByRole performs navigation using the BuildContext; ensure the
-      // widget is still mounted before calling it.
-      if (!mounted) return;
-      await routeByRole(context, u);
-      return; // we’ve navigated; don’t fall through to Navigator.pop
+      await user.getIdToken(true); // refresh token so claim is present later
     } on FirebaseFunctionsException catch (e) {
       debugPrint('selfSetRole failed: ${e.code} ${e.message}');
-      // Fallback: you’ll still route as default "user" (no claim) until admin fixes functions
+      // App will still work; user will just look like default "user" until fixed.
     }
 
-    // TODO MFA IMPLEMENTATION: only call enrollment when mounted.
+    try {
+  await user.sendEmailVerification();
+} on FirebaseAuthException catch (e) {
+  if (e.code == 'too-many-requests') {
+    debugPrint('Email verification throttled: ${e.message}');
     if (mounted) {
-      await MfaEnrollment.maybeStartAfterSignup(
-        context,
-        phoneRaw: _phoneCtrl.text.trim(),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Too many verification requests. Please wait a few minutes and try again.',
+          ),
+        ),
       );
     }
+  } else {
+    rethrow; // or handle other email issues too
+  }
+}
 
-    if (!mounted) return;
+    // 5) Inform user, then go to VerifyEmailPage → that will later send them
+    //    to SMS MFA enrollment and finally routeByRole.
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account created!')),
+      const SnackBar(
+        content: Text('Account created! Check your email to verify.'),
+      ),
     );
-    Navigator.pop(context); // back to Home; AuthGate/RoleRouter will take over
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => VerifyEmailPage(
+          email: user.email ?? _emailCtrl.text.trim(),
+          phonePrefill: _phoneCtrl.text.trim(),
+        ),
+      ),
+    );
   } catch (e) {
     final msg = _friendlyError(e);
     if (!mounted) return;
@@ -230,6 +253,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     );
   }
 }
+
 //ends here
   // InputDecoration helper with short, example-style hints
   InputDecoration _dec(String label, {bool required = false, String? hint}) {
