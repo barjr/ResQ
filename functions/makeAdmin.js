@@ -1,3 +1,5 @@
+/*SCRIPT TO MAKE ADMIN0 ACCOUNT, USE ONLY IF admin0@gmail.com gets deleted somehow */
+
 "use strict";
 
 const admin = require("firebase-admin");
