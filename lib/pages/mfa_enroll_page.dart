@@ -1,3 +1,8 @@
+/*THIS PAGE IS GOING TO BE REPLACED BY SMS_ENROLLMENT.DART
+  THIS WAS SUPPOSED TO BE FOR TOTP SETUP WHICH I MIGHT STILL USE IF GOOGLE CLOUD STOPS PLAYING LIKE THAT
+
+  */
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 

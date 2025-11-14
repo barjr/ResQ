@@ -1,4 +1,5 @@
 // lib/services/role_router.dart
+/*CONTAINS ALL LOGIC TO REROUTE THE USER AFTER LOGIN BASED ON THE USER'S ROLE */
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
