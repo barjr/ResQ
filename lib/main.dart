@@ -23,7 +23,13 @@ void main() async {
 
   // Save helper token (optional)
   if (token != null) {
-    await notifService.saveHelperToken('helper123', token);
+    try {
+      await notifService.saveHelperToken('helper123', token);
+    } catch (e) {
+      // Firestore may reject writes when the app isn't authenticated or rules disallow
+      // them. Don't crash the app on startup; log and continue.
+      debugPrint('Failed to save helper token: $e');
+    }
   }
 
   runApp(MyApp());
