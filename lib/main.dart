@@ -8,7 +8,7 @@ import 'package:resq/services/notification_service.dart';
 import 'package:resq/services/role_router.dart';
 import 'package:resq/services/request_store.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -16,14 +16,20 @@ Future<void> main() async {
   // in-memory RequestStore so dashboards update in real-time.
   RequestStore.instance.startFirestoreSync();
 
-  //Notification information
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-  notificationService.handleForegroundMessages();
-  notificationService.handleNotificationTaps();
+  final notifService = NotificationService();
+  final token = await notifService.initialize();
+  notifService.handleForegroundMessages();
+  notifService.handleNotificationTaps();
 
-  runApp(const MyApp());
+  // Save helper token (optional)
+  if (token != null) {
+    await notifService.saveHelperToken('helper123', token);
+  }
+
+  runApp(MyApp());
 }
+
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
