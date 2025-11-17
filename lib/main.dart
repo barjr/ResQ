@@ -4,12 +4,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
-import 'package:resq/pages/dashboard.dart';
 import 'package:resq/services/notification_service.dart';
+import 'package:resq/services/role_router.dart';
+import 'package:resq/services/request_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Start syncing active emergency requests from Firestore into the
+  // in-memory RequestStore so dashboards update in real-time.
+  RequestStore.instance.startFirestoreSync();
 
   final notifService = NotificationService();
   final token = await notifService.initialize();
@@ -55,12 +60,9 @@ class AuthGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        // If logged in -> Dashboard, else -> Login page
-        if (snap.data != null) {
-          return const DashboardPage();
-        } else {
-          return const HomePage();
-        }
+        final user = snap.data;
+        if (user == null) return const HomePage();
+        return RoleRouter(user: user); // go route by role
       },
     );
   }

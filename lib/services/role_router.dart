@@ -1,10 +1,10 @@
 // lib/services/role_router.dart
+/*CONTAINS ALL LOGIC TO REROUTE THE USER AFTER LOGIN BASED ON THE USER'S ROLE */
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:resq/pages/admin_view.dart';
-import 'package:resq/pages/customer_view.dart';
+
 import 'package:resq/pages/dashboard.dart';
-import 'package:resq/pages/helper_view.dart';
+import 'package:resq/pages/home.dart';
 
 class RoleRouter extends StatelessWidget {
   final User user;
@@ -32,8 +32,6 @@ class RoleRouter extends StatelessWidget {
     return null;
   }
 
-  
-
   @override
   Widget build(BuildContext context) {
     // Listen only to *auth state* changes; avoid token-change loops
@@ -41,34 +39,44 @@ class RoleRouter extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         final u = snap.data;
         if (u == null) {
-          // Signed out — your app’s Home/Login
-          return const CustomerViewPage(); // or HomePage() if you prefer here
+          // Signed out — show the public Home/Login page
+          return const HomePage();
         }
 
         return FutureBuilder<String?>(
           future: _readRoleOnce(u),
           builder: (context, fsnap) {
             if (fsnap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
             }
             if (fsnap.hasError) {
-              return Scaffold(body: Center(child: Text('Error: ${fsnap.error}')));
+              return Scaffold(
+                body: Center(child: Text('Error: ${fsnap.error}')),
+              );
             }
 
             final role = fsnap.data; // may be null
+            // Route all signed-in users to the Dashboard. Admins receive the
+            // full dashboard (isAdmin: true). Helpers and regular users get
+            // the same Dashboard UI but with admin features hidden; helpers
+            // additionally hide SOS/Get Help/Customer links via isHelper.
             switch (role) {
               case 'admin':
-                return const AdminViewPage();
+                return const DashboardPage(isAdmin: true, isHelper: false);
               case 'helper':
-                return const HelperViewPage();
+                return const DashboardPage(isAdmin: false, isHelper: true);
               case 'user':
               case null:
               default:
-                return const CustomerViewPage();
+                return const DashboardPage(isAdmin: false, isHelper: false);
             }
           },
         );
@@ -81,7 +89,7 @@ Future<void> routeByRole(BuildContext context, User user) async {
   await user.getIdToken(true);
 
   String? role;
-  const tries = 8;           
+  const tries = 8;
   for (var i = 0; i < tries; i++) {
     final tok = await user.getIdTokenResult();
     final r = tok.claims?['role'];
@@ -93,16 +101,17 @@ Future<void> routeByRole(BuildContext context, User user) async {
   Widget dest;
   switch (role) {
     case 'admin':
-      dest = const AdminViewPage();
+      dest = const DashboardPage(isAdmin: true, isHelper: false);
       break;
     case 'helper':
-      dest = const HelperViewPage();
+      dest = const DashboardPage(isAdmin: false, isHelper: true);
       break;
     case 'user':
-      dest = const DashboardPage();
+      dest = const DashboardPage(isAdmin: false, isHelper: false);
+      break;
     case null:
     default:
-      dest = const CustomerViewPage();
+      dest = const DashboardPage(isAdmin: false, isHelper: false);
   }
 
   if (!context.mounted) return;
