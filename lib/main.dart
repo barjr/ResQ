@@ -6,22 +6,25 @@ import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/pages/dashboard.dart';
 import 'package:resq/services/notification_service.dart';
-import 'package:resq/services/role_router.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp();
 
-  //Notification information
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-  notificationService.handleForegroundMessages();
-  notificationService.handleNotificationTaps();
+  final notifService = NotificationService();
+  final token = await notifService.initialize();
+  notifService.handleForegroundMessages();
+  notifService.handleNotificationTaps();
 
-  runApp(const MyApp());
+  // Save helper token (optional)
+  if (token != null) {
+    await notifService.saveHelperToken('helper123', token);
+  }
+
+  runApp(MyApp());
 }
+
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -48,11 +51,16 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
-        final user = snap.data;
-        if (user == null) return const HomePage();
-        return RoleRouter(user: user);                  // go route by role
+        // If logged in -> Dashboard, else -> Login page
+        if (snap.data != null) {
+          return const DashboardPage();
+        } else {
+          return const HomePage();
+        }
       },
     );
   }
