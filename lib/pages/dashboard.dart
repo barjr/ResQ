@@ -8,6 +8,7 @@ import 'package:resq/pages/sos_report.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart';
 import 'package:resq/pages/tiered_report.dart';
+import 'package:resq/services/notification_service.dart';
 
 // Dashboard: central landing page for signed-in users.
 // - Shows an SOS quick action and quick links to Customer/Helper views.
@@ -553,4 +554,33 @@ class _DisclaimerAppBarBottom extends StatelessWidget
       ),
     );
   }
+  
+  // This is for noticiations??
+  Future<void> _saveTokenIfHelperOrAdmin() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Get user's role from custom claims
+    final idTokenResult = await user.getIdTokenResult(true);
+    final role = idTokenResult.claims?['role'] as String?;
+    
+    debugPrint('User role: $role');
+
+    // Save token for all users (the Cloud Function will filter by role)
+    final notifService = NotificationService();
+    final token = await notifService.initialize();
+    
+    if (token != null) {
+      await notifService.saveUserToken(user.uid, token);
+      debugPrint('Token saved for user: ${user.uid}, role: $role');
+    } else {
+      debugPrint('No FCM token available');
+    }
+  } catch (e) {
+    debugPrint('Error saving token: $e');
+  }
 }
+
+}
+

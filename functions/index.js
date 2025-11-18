@@ -1,35 +1,3 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
-// const {setGlobalOptions} = require("firebase-functions");
-// const {onRequest} = require("firebase-functions/https");
-// const logger = require("firebase-functions/logger");
-
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-// setGlobalOptions({maxInstances: 10});
-
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
-
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
 "use strict";
 
 const functions = require("firebase-functions");
@@ -42,7 +10,6 @@ admin.initializeApp();
  * Only callable by an existing admin.
  */
 exports.setRole = functions.https.onCall(async (data, context) => {
-  // Must be signed in
   if (!context.auth) {
     throw new functions.https.HttpsError(
         "unauthenticated",
@@ -75,8 +42,37 @@ exports.setRole = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Callable: selfSetRole({ role })
+ * Allows users to set their own role during account creation
+ */
+exports.selfSetRole = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Sign in required.",
+    );
+  }
+
+  const {role} = data;
+  const allowed = ["helper", "user"];
+
+  if (!allowed.includes(role)) {
+    throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Role must be 'helper' or 'user'.",
+    );
+  }
+
+  const uid = context.auth.uid;
+  await admin.auth().setCustomUserClaims(uid, {role: role});
+  await admin.auth().revokeRefreshTokens(uid);
+
+  return {ok: true, roleSet: role};
+});
+
+/**
  * Firestore Trigger: notifyHelpers
- * Sends push notifications to all active helpers when a new emergency request is created
+ * Sends push notifications to all helpers and admins when a new emergency request is created
  */
 exports.notifyHelpers = functions.firestore
     .document("emergency_requests/{requestId}")
@@ -84,64 +80,74 @@ exports.notifyHelpers = functions.firestore
       const requestId = context.params.requestId;
       const request = snap.data();
 
-      console.log('═══════════════════════════════════════');
-      console.log(' NEW EMERGENCY REQUEST RECEIVED');
-      console.log('═══════════════════════════════════════');
+      console.log('New emergency request received');
       console.log('Request ID:', requestId);
       console.log('Reporter:', request.reporterName || 'Unknown');
       console.log('Description:', request.description || 'No description');
       console.log('Location:', request.location || 'Not provided');
-      console.log('Timestamp:', new Date().toISOString());
-      console.log('Status:', request.status || 'N/A');
-      console.log('───────────────────────────────────────');
+      console.log('Severity:', request.severity || 'Not specified');
 
       try {
-        // Get all active helpers with FCM tokens
-        const helpersSnapshot = await admin.firestore()
-            .collection("helpers")
-            .where("isActive", "==", true)
+        // Get all users from Firestore
+        const usersSnapshot = await admin.firestore()
+            .collection("users")
             .get();
 
-        console.log(` Found ${helpersSnapshot.size} active helper(s)`);
+        console.log(`Found ${usersSnapshot.size} total user(s)`);
 
         const tokens = [];
         const helperDetails = [];
         
-        helpersSnapshot.forEach((doc) => {
-          const helperData = doc.data();
-          const token = helperData.fcmToken;
+        // Check each user's role claim and collect tokens from helpers/admins
+        for (const doc of usersSnapshot.docs) {
+          const userData = doc.data();
+          const userId = doc.id;
           
-          helperDetails.push({
-            id: doc.id,
-            name: helperData.name || 'Unknown',
-            hasToken: !!token
-          });
-          
-          if (token) {
-            tokens.push(token);
-            console.log(`   Helper: ${helperData.name || doc.id} - Token available`);
-          } else {
-            console.log(`   Helper: ${helperData.name || doc.id} - No FCM token`);
+          try {
+            // Get user's custom claims to check role
+            const userRecord = await admin.auth().getUser(userId);
+            const role = userRecord.customClaims?.role;
+            
+            // Only send to helpers and admins
+            if (role === 'helper' || role === 'admin') {
+              const token = userData.fcmToken;
+              
+              helperDetails.push({
+                id: userId,
+                name: userData.name || 'Unknown',
+                role: role,
+                hasToken: !!token
+              });
+              
+              if (token) {
+                tokens.push(token);
+                console.log(`${role}: ${userData.name || userId} - Token available`);
+              } else {
+                console.log(`${role}: ${userData.name || userId} - No FCM token`);
+              }
+            }
+          } catch (error) {
+            console.log(`Could not get auth record for user ${userId}: ${error.message}`);
           }
-        });
+        }
 
         if (tokens.length === 0) {
-          console.log(' WARNING: No helpers with valid FCM tokens available');
-          console.log('Helpers found:', helpersSnapshot.size);
-          console.log('Helpers with tokens:', 0);
-          console.log('═══════════════════════════════════════');
+          console.log('WARNING: No helpers/admins with valid FCM tokens available');
+          console.log('Total helpers/admins found:', helperDetails.length);
+          console.log('Helpers/admins with tokens:', 0);
           return null;
         }
 
-        console.log(` Preparing to send notifications to ${tokens.length} helper(s)`);
+        console.log(`Preparing to send notifications to ${tokens.length} helper(s)/admin(s)`);
 
         // Create the notification message
         const description = request.description || "Emergency assistance needed";
         const location = request.location || "Location not specified";
+        const severity = request.severity || "unknown";
 
         const message = {
           notification: {
-            title: " Emergency Alert",
+            title: severity === "critical" ? "CRITICAL Emergency Alert" : "Emergency Alert",
             body: description.substring(0, 100) + (description.length > 100 ? "..." : ""),
           },
           data: {
@@ -149,64 +155,98 @@ exports.notifyHelpers = functions.firestore
             location: location,
             description: description.substring(0, 200),
             reporterName: request.reporterName || "Unknown",
+            severity: severity,
             type: "emergency",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
+          android: {
+            priority: "high",
+            notification: {
+              channelId: "default_channel",
+              priority: "max",
+              sound: "default",
+            },
+          },
         };
 
-        console.log(' Sending notifications...');
+        console.log('Sending notifications...');
 
-        // Send to all helper tokens
+        // Send to all helper/admin tokens
         const response = await admin.messaging().sendEachForMulticast({
           tokens: tokens,
           ...message,
         });
 
-        console.log('───────────────────────────────────────');
-        console.log('NOTIFICATION RESULTS:');
-        console.log(`  Total sent: ${tokens.length}`);
-        console.log(`  Success: ${response.successCount}`);
-        console.log(`  Failure: ${response.failureCount}`);
+        console.log('Notification Results:');
+        console.log(`Total sent: ${tokens.length}`);
+        console.log(`Success: ${response.successCount}`);
+        console.log(`Failure: ${response.failureCount}`);
 
-        // Log individual failures with details
+        // Log individual results
         if (response.failureCount > 0) {
-          console.log('\n FAILED NOTIFICATIONS:');
+          console.log('Failed notifications:');
           response.responses.forEach((resp, idx) => {
             if (!resp.success) {
               const helper = helperDetails[idx];
-              console.log(`  - Helper: ${helper?.name || 'Unknown'} (${helper?.id || 'N/A'})`);
-              console.log(`    Error: ${resp.error?.message || 'Unknown error'}`);
-              console.log(`    Error Code: ${resp.error?.code || 'N/A'}`);
+              console.log(`- ${helper?.role}: ${helper?.name || 'Unknown'} (${helper?.id || 'N/A'})`);
+              console.log(`  Error: ${resp.error?.message || 'Unknown error'}`);
             }
           });
         }
 
-        // Log successful notifications
         if (response.successCount > 0) {
-          console.log('\n✅ SUCCESSFUL NOTIFICATIONS:');
+          console.log('Successful notifications:');
           response.responses.forEach((resp, idx) => {
             if (resp.success) {
               const helper = helperDetails[idx];
-              console.log(`  - Helper: ${helper?.name || 'Unknown'} (${helper?.id || 'N/A'})`);
+              console.log(`- ${helper?.role}: ${helper?.name || 'Unknown'}`);
             }
           });
         }
 
-        console.log('═══════════════════════════════════════\n');
+        // Clean up invalid tokens
+        if (response.failureCount > 0) {
+          const tokensToRemove = [];
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              const error = resp.error;
+              
+              if (error?.code === 'messaging/invalid-registration-token' ||
+                  error?.code === 'messaging/registration-token-not-registered') {
+                tokensToRemove.push(tokens[idx]);
+              }
+            }
+          });
+
+          if (tokensToRemove.length > 0) {
+            console.log(`Removing ${tokensToRemove.length} invalid token(s)`);
+            const batch = admin.firestore().batch();
+            
+            for (const token of tokensToRemove) {
+              const userQuery = await admin.firestore()
+                  .collection("users")
+                  .where("fcmToken", "==", token)
+                  .limit(1)
+                  .get();
+              
+              userQuery.forEach((doc) => {
+                batch.update(doc.ref, {
+                  fcmToken: admin.firestore.FieldValue.delete(),
+                });
+              });
+            }
+            
+            await batch.commit();
+          }
+        }
 
         return response;
 
       } catch (error) {
-        console.error('═══════════════════════════════════════');
-        console.error('ERROR SENDING NOTIFICATIONS');
-        console.error('═══════════════════════════════════════');
+        console.error('Error sending notifications');
         console.error('Request ID:', requestId);
-        console.error('Error Message:', error.message);
-        console.error('Error Code:', error.code);
-        console.error('Error Stack:', error.stack);
-        console.error('═══════════════════════════════════════\n'); 
-        
-        // Don't throw - just log and return null so the function completes
+        console.error('Error:', error.message);
+        console.error('Stack:', error.stack);
         return null;
       }
     });
