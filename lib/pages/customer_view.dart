@@ -123,6 +123,29 @@ class CustomerViewPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+                            const SizedBox(height: 24),
+
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MedicalDocumentsPage(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFFC3B3C),
+                  side: const BorderSide(color: Color(0xFFFC3B3C)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.folder_shared),
+                label: const Text(
+                  'Manage My Medical Documents',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+
             ],
           ),
         ),
