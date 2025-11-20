@@ -8,6 +8,8 @@ import 'package:resq/pages/sos_report.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart';
 import 'package:resq/pages/tiered_report.dart';
+import 'package:resq/pages/medical_documents_page.dart';
+
 
 // Dashboard: central landing page for signed-in users.
 // - Shows an SOS quick action and quick links to Customer/Helper views.
@@ -226,7 +228,27 @@ class _DashboardPageState extends State<DashboardPage> {
                 // regular user view per product requirement. Regular users
                 // only see the emergency reporting buttons above.
               ],
+              OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const MedicalDocumentsPage(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFC3B3C),
+                    side: const BorderSide(color: Color(0xFFFC3B3C)),
+                    padding: const EdgeInsets.all(20),
+                  ),
+                  icon: const Icon(Icons.folder_shared),
+                  label: const Text(
+                    'Manage My Medical Documents',
+                    style: TextStyle(fontSize: 15),
+                  ),
+                ),
 
+                SizedBox(height: 12),
               // Show Customer and Helper view buttons to admins/helpers only
               if (!isRegular) ...[
                 // Customer view should be admin-only (helpers should not see it)
