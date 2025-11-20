@@ -555,7 +555,7 @@ class _DisclaimerAppBarBottom extends StatelessWidget
     );
   }
   
-  // This is for noticiations??
+  // This is for notifications??
   Future<void> _saveTokenIfHelperOrAdmin() async {
   try {
     final user = FirebaseAuth.instance.currentUser;
