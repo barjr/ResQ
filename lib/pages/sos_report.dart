@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:resq/services/summarizer.dart';
 import 'package:resq/services/request_store.dart';
@@ -127,15 +128,34 @@ class _SosReportPageState extends State<SosReportPage> {
                 // Save to Firestore - this triggers the Cloud Function
                 await FirebaseFirestore.instance
                   .collection('emergency_requests')
-                  .add({
-                    'reporterName': 'Anonymous',
-                    'description': _descCtrl.text.trim(),
-                    'location': _locationCtrl.text.trim().isEmpty 
-                      ? null 
-                      : _locationCtrl.text.trim(),
-                    'timestamp': FieldValue.serverTimestamp(),
-                    'status': 'pending',
-                  });
+                  final currentUser = FirebaseAuth.instance.currentUser;
+final reporterUid = currentUser?.uid;
+final reporterName = (() {
+  if (currentUser == null) return 'Anonymous';
+  if (currentUser.displayName != null &&
+      currentUser.displayName!.trim().isNotEmpty) {
+    return currentUser.displayName!.trim();
+  }
+  final email = currentUser.email;
+  if (email != null && email.contains('@')) {
+    return email.split('@').first;
+  }
+  return 'User';
+})();
+
+await FirebaseFirestore.instance
+  .collection('emergency_requests')
+  .add({
+    'reporterUid': reporterUid,  // NEW
+    'reporterName': reporterName,
+    'description': _descCtrl.text.trim(),
+    'location': _locationCtrl.text.trim().isEmpty 
+      ? null 
+      : _locationCtrl.text.trim(),
+    'timestamp': FieldValue.serverTimestamp(),
+    'status': 'pending',
+    'source': 'sos',
+  });
                 
                 // Still add to in-memory store for local use
                 RequestStore.instance.addRequest(
