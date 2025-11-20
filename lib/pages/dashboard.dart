@@ -45,34 +45,18 @@ class _DashboardPageState extends State<DashboardPage> {
     // bottom navigation bar. Note the actual index value depends on whether
     // `isAdmin` is set (Roles may insert at index 1).
     if (index == (widget.isAdmin ? 2 : 1)) {
-      (Navigator.of(context)
-          .push(
-            MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(
-                  title: const Text('Settings'),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-                body: const Center(
-                  child: Text(
-                    'Under construction :(',
-                    style: TextStyle(fontSize: 30),
-                  ),
-                ),
-              ),
-            ),
-          )
-          .then((_) {
-            setState(() {
-              _selectedIndex = 0;
-            });
-          }));
-    }
+  Navigator.of(context)
+      .push(
+        MaterialPageRoute(
+          builder: (_) => const UserSettingsPage(),
+        ),
+      )
+      .then((_) {
+        setState(() {
+          _selectedIndex = 0;
+        });
+      });
+}
     // Roles tab for admins: when an admin taps the Roles tab (index 1)
     // we push the `AdminViewPage` which contains the role-management UI.
     // We then reset the selected index back to Home when the admin returns.
@@ -228,27 +212,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 // regular user view per product requirement. Regular users
                 // only see the emergency reporting buttons above.
               ],
-              OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const MedicalDocumentsPage(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFC3B3C),
-                    side: const BorderSide(color: Color(0xFFFC3B3C)),
-                    padding: const EdgeInsets.all(20),
-                  ),
-                  icon: const Icon(Icons.folder_shared),
-                  label: const Text(
-                    'Manage My Medical Documents',
-                    style: TextStyle(fontSize: 15),
-                  ),
-                ),
-
-                SizedBox(height: 12),
               // Show Customer and Helper view buttons to admins/helpers only
               if (!isRegular) ...[
                 // Customer view should be admin-only (helpers should not see it)
