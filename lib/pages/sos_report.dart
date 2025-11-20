@@ -124,11 +124,10 @@ class _SosReportPageState extends State<SosReportPage> {
             onPressed: () async {  // Add async here
               Navigator.of(context).pop();
               
+
+
               try {
-                // Save to Firestore - this triggers the Cloud Function
-                await FirebaseFirestore.instance
-                  .collection('emergency_requests')
-                  final currentUser = FirebaseAuth.instance.currentUser;
+                final currentUser = FirebaseAuth.instance.currentUser;
 final reporterUid = currentUser?.uid;
 final reporterName = (() {
   if (currentUser == null) return 'Anonymous';
@@ -142,8 +141,8 @@ final reporterName = (() {
   }
   return 'User';
 })();
-
-await FirebaseFirestore.instance
+                // Save to Firestore - this triggers the Cloud Function
+                await FirebaseFirestore.instance
   .collection('emergency_requests')
   .add({
     'reporterUid': reporterUid,  // NEW
