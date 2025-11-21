@@ -13,52 +13,7 @@ class HelperViewPage extends StatefulWidget {
 class _HelperViewPageState extends State<HelperViewPage> {
   //No more RequestStore subscription – we read directly from Firestore.
 
-  Future<void> _acceptRequest(
-    BuildContext context,
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) async {
-    final data = doc.data() ?? {};
-    final reporterName = (data['reporterName'] ?? 'Unknown') as String;
-    final severity = (data['severity'] ?? 'critical') as String?;
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Accept Request'),
-        content: Text(
-          'Accept ${_severityLabel(severity)} request from $reporterName?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-
-              try {
-                // Mark as accepted (no exclusivity; just a status update)
-                await doc.reference.update({'status': 'accepted'});
-
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('You accepted $reporterName')),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to accept: $e')),
-                );
-              }
-            },
-            child: const Text('Accept'),
-          ),
-        ],
-      ),
-    );
-  }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
