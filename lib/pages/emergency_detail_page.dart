@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 class EmergencyDetailPage extends StatelessWidget {
   final String requestId;
@@ -19,6 +21,8 @@ class EmergencyDetailPage extends StatelessWidget {
     final location = (data['location'] ?? '') as String?;
     final status = (data['status'] ?? 'pending') as String;
     final severity = (data['severity'] ?? 'critical') as String?;
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
     final ts = data['timestamp'] as Timestamp?;
     final timeText = ts != null
         ? '${ts.toDate()}'
@@ -67,24 +71,70 @@ class EmergencyDetailPage extends StatelessWidget {
                       style: const TextStyle(fontSize: 16),
                     ),
                     const SizedBox(height: 12),
-                    if (location != null && location.isNotEmpty)
-                      Row(
-                        children: [
-                          const Icon(Icons.place, size: 18),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              location,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Reported by: $reporterName',
-                      style: const TextStyle(color: Colors.grey),
-                    ),
+                    // Location + maps section
+if ((location != null && location.isNotEmpty) || (lat != null && lng != null))
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.place, size: 18),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              (location != null && location.isNotEmpty)
+                  ? location
+                  : 'Location not specified',
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+      if (lat != null && lng != null) ...[
+        const SizedBox(height: 4),
+        Text(
+          'GPS: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: () async {
+            final uri = Uri.parse(
+              'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+            );
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not open maps app.'),
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFC3B3C),
+            foregroundColor: Colors.white,
+          ),
+          icon: const Icon(Icons.directions),
+          label: const Text('Open in Maps'),
+        ),
+      ],
+    ],
+  ),
+const SizedBox(height: 8),
+
+Text(
+  'Reported by: $reporterName',
+  style: const TextStyle(color: Colors.grey),
+),
+const SizedBox(height: 4),
+Text(
+  'At: $timeText',
+  style: const TextStyle(color: Colors.grey),
+),
+
                     const SizedBox(height: 4),
                     Text(
                       'At: $timeText',
