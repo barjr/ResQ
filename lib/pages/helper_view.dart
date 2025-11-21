@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/pages/emergency_detail_page.dart';
 
@@ -11,9 +12,82 @@ class HelperViewPage extends StatefulWidget {
 }
 
 class _HelperViewPageState extends State<HelperViewPage> {
-  //No more RequestStore subscription – we read directly from Firestore.
+  // No more RequestStore subscription – we read directly from Firestore.
 
-  
+  Future<void> _acceptRequest(
+    BuildContext context,
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to accept.')),
+      );
+      return;
+    }
+
+    final data = doc.data() ?? {};
+    final reporterName = (data['reporterName'] ?? 'Unknown') as String;
+    final severity = (data['severity'] ?? 'critical') as String?;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Accept Request'),
+        content: Text(
+          'Accept ${_severityLabel(severity)} request from $reporterName?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop(); // close dialog
+
+              try {
+                // Update Firestore: mark as accepted
+                await doc.reference.update({
+                  'status': 'accepted',
+                  'acceptedBy': user.uid,
+                  'acceptedAt': FieldValue.serverTimestamp(),
+                });
+
+                if (!mounted) return;
+
+                // For the detail page, start from current data and override status.
+                final updatedData = Map<String, dynamic>.from(data);
+                updatedData['status'] = 'accepted';
+                updatedData['acceptedBy'] = user.uid;
+
+                // Navigate to the emergency detail page
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EmergencyDetailPage(
+                      requestId: doc.id,
+                      data: updatedData,
+                    ),
+                  ),
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('You accepted $reporterName')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to accept: $e')),
+                );
+              }
+            },
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,13 +115,13 @@ class _HelperViewPageState extends State<HelperViewPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Pending Requests',
+                'Active Emergencies',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
 
-              //Firestore list of emergencies
+              // Firestore list of emergencies
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
@@ -69,7 +143,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
                     final docs = snap.data?.docs ?? [];
                     if (docs.isEmpty) {
                       return const Center(
-                        child: Text('No pending requests'),
+                        child: Text('No active emergencies.'),
                       );
                     }
 
@@ -93,7 +167,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
 
                         return ListTile(
                           onTap: () {
-                            //Tap card -> detailed emergency page
+                            // Tap card -> detailed emergency page
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => EmergencyDetailPage(
