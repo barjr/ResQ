@@ -138,7 +138,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
 
                         return ListTile(
                           onTap: () {
-                            // 👉 Tap card -> detailed emergency page
+                            //Tap card -> detailed emergency page
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => EmergencyDetailPage(
