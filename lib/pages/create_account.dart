@@ -4,9 +4,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-//import 'package:resq/pages/mfa_enrollment.dart';
-//import 'package:resq/services/role_router.dart';
 import 'package:resq/pages/verify_email.dart';
+import 'package:resq/services/notification_service.dart';
 
 final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
@@ -145,115 +144,124 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   String _fmtDate(DateTime d) =>
       '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';
 
-Future<void> _submit() async {
-  final valid = _formKey.currentState?.validate() ?? false;
-  if (!valid) return;
+  Future<void> _submit() async {
+    final valid = _formKey.currentState?.validate() ?? false;
+    if (!valid) return;
 
-  // Extra checks
-  if (_isBystander) {
-    if (_certIssuerCtrl.text.trim().isEmpty ||
-        _certExpiresOn == null ||
-        (_uploadedCertPlaceholder == null ||
-            _uploadedCertPlaceholder!.isEmpty)) {
+    if (_isBystander) {
+      if (_certIssuerCtrl.text.trim().isEmpty ||
+          _certExpiresOn == null ||
+          (_uploadedCertPlaceholder == null ||
+              _uploadedCertPlaceholder!.isEmpty)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please complete all bystander fields.')),
+        );
+        return;
+      }
+    }
+
+    if (_addMedicalProfile && !_consentMedicalAccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all bystander fields.')),
+        const SnackBar(
+          content:
+              Text('Please allow medical profile access or uncheck the profile.'),
+        ),
       );
       return;
     }
-  }
-
-  if (_addMedicalProfile && !_consentMedicalAccess) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Please allow medical profile access or uncheck the profile.'),
-      ),
-    );
-    return;
-  }
-
-  try {
-    // 1) Create auth user
-    final cred = await FirebaseAuth.instance
-        .createUserWithEmailAndPassword(
-      email: _emailCtrl.text.trim(),
-      password: _passwordCtrl.text,
-    );
-    final user = cred.user!;
-    await user.updateDisplayName(_nameCtrl.text.trim());
-
-    // 2) Create/merge Firestore user doc
-    final uid = user.uid;
-    await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'email': _emailCtrl.text.trim(),
-      'name': _nameCtrl.text.trim(),
-      'phone': _phoneCtrl.text.trim(),
-      'dob': _dobCtrl.text.trim(),
-      'emergencyContact': {
-        'name': _ecNameCtrl.text.trim(),
-        'phone': _ecPhoneCtrl.text.trim(),
-      },
-      'medicalId': _medicalIdCtrl.text.trim().isEmpty
-          ? null
-          : _medicalIdCtrl.text.trim(),
-      'isBystander': _isBystander,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    // 3) Best-effort: set initial role claim (helper/user)
-    try {
-      final setRoleFn = _functions.httpsCallable('selfSetRole');
-      await setRoleFn.call({'role': _chosenRole}); // 'helper' or 'user'
-      await user.getIdToken(true); // refresh token so claim is present later
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('selfSetRole failed: ${e.code} ${e.message}');
-      // App will still work; user will just look like default "user" until fixed.
-    }
 
     try {
-  await user.sendEmailVerification();
-} on FirebaseAuthException catch (e) {
-  if (e.code == 'too-many-requests') {
-    debugPrint('Email verification throttled: ${e.message}');
-    if (mounted) {
+      // 1) Create auth user
+      final cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+      final user = cred.user!;
+      await user.updateDisplayName(_nameCtrl.text.trim());
+
+      // 2) Create/merge Firestore user doc
+      final uid = user.uid;
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'email': _emailCtrl.text.trim(),
+        'name': _nameCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'dob': _dobCtrl.text.trim(),
+        'emergencyContact': {
+          'name': _ecNameCtrl.text.trim(),
+          'phone': _ecPhoneCtrl.text.trim(),
+        },
+        'medicalId': _medicalIdCtrl.text.trim().isEmpty
+            ? null
+            : _medicalIdCtrl.text.trim(),
+        'isBystander': _isBystander,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // 3) Set initial role claim
+      try {
+        final setRoleFn = _functions.httpsCallable('selfSetRole');
+        await setRoleFn.call({'role': _chosenRole});
+        await user.getIdToken(true);
+        
+        // 4) Save FCM token for all users (Cloud Function filters by role)
+        try {
+          final notifService = NotificationService();
+          final token = await notifService.initialize();
+          if (token != null) {
+            await notifService.saveUserToken(uid, token);
+            debugPrint('FCM token saved during account creation');
+          }
+        } catch (e) {
+          debugPrint('Failed to save FCM token: $e');
+        }
+      } on FirebaseFunctionsException catch (e) {
+        debugPrint('selfSetRole failed: ${e.code} ${e.message}');
+      }
+
+      // 5) Send email verification
+
+      try {
+        await user.sendEmailVerification();
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'too-many-requests') {
+          debugPrint('Email verification throttled: ${e.message}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Too many verification requests. Please wait a few minutes and try again.',
+                ),
+              ),
+            );
+          }
+        } else {
+          rethrow;
+        }
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Too many verification requests. Please wait a few minutes and try again.',
+          content: Text('Account created! Check your email to verify.'),
+        ),
+      );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => VerifyEmailPage(
+            email: user.email ?? _emailCtrl.text.trim(),
+            phonePrefill: _phoneCtrl.text.trim(),
           ),
         ),
       );
+    } catch (e) {
+      final msg = _friendlyError(e);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Account creation failed: $msg')),
+      );
     }
-  } else {
-    rethrow; // or handle other email issues too
   }
-}
-
-    // 5) Inform user, then go to VerifyEmailPage → that will later send them
-    //    to SMS MFA enrollment and finally routeByRole.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Account created! Check your email to verify.'),
-      ),
-    );
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => VerifyEmailPage(
-          email: user.email ?? _emailCtrl.text.trim(),
-          phonePrefill: _phoneCtrl.text.trim(),
-        ),
-      ),
-    );
-  } catch (e) {
-    final msg = _friendlyError(e);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Account creation failed: $msg')),
-    );
-  }
-}
-
 //ends here
   // InputDecoration helper with short, example-style hints
   InputDecoration _dec(String label, {bool required = false, String? hint}) {

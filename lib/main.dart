@@ -4,38 +4,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
+import 'package:resq/pages/dashboard.dart';
 import 'package:resq/services/notification_service.dart';
-import 'package:resq/services/role_router.dart';
-import 'package:resq/services/request_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Start syncing active emergency requests from Firestore into the
-  // in-memory RequestStore so dashboards update in real-time.
-  RequestStore.instance.startFirestoreSync();
-
+  // Initialize notification service
   final notifService = NotificationService();
-  final token = await notifService.initialize();
+  await notifService.initialize();
   notifService.handleForegroundMessages();
   notifService.handleNotificationTaps();
 
-  // Save helper token (optional)
-  if (token != null) {
-    try {
-      await notifService.saveHelperToken('helper123', token);
-    } catch (e) {
-      // Firestore may reject writes when the app isn't authenticated or rules disallow
-      // them. Don't crash the app on startup; log and continue.
-      debugPrint('Failed to save helper token: $e');
-    }
-  }
-
-  runApp(MyApp());
+  runApp(const MyApp());
 }
-
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -45,7 +28,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'ResQ App',
-      //use an auth-gate:
       home: const AuthGate(),
       onUnknownRoute: (settings) =>
           MaterialPageRoute(builder: (_) => const HomePage()),
@@ -66,9 +48,11 @@ class AuthGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        final user = snap.data;
-        if (user == null) return const HomePage();
-        return RoleRouter(user: user); // go route by role
+        if (snap.data != null) {
+          return const DashboardPage();
+        } else {
+          return const HomePage();
+        }
       },
     );
   }

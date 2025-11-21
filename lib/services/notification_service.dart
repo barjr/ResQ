@@ -1,5 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 
@@ -8,12 +9,11 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotif =
       FlutterLocalNotificationsPlugin();
 
-  // Android channel id / name
   static const String _androidChannelId = 'default_channel';
   static const String _androidChannelName = 'Default';
-
+  
   Future<String?> initialize() async {
-    // request permissions on iOS (Android handled separately)
+    // Request permissions
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -21,24 +21,25 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      debugPrint('User granted permission');
+      debugPrint('User granted notification permission');
+    } else {
+      debugPrint('User declined or has not accepted notification permission');
     }
 
     // Initialize flutter_local_notifications
     const androidInitSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    final initSettings = InitializationSettings(android: androidInitSettings);
+    const initSettings = InitializationSettings(android: androidInitSettings);
+    
     await _localNotif.initialize(
       initSettings,
-      // optional: handle notification taps while app in foreground/background
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         debugPrint('Local notification tapped: ${response.payload}');
-        // Handle navigation if needed
       },
     );
 
-    // Create Android notification channel (required for Android 8+)
-    final androidPlugin = _localNotif.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    // Create Android notification channel
+    final androidPlugin = _localNotif.resolvePlatformSpecificImplementation
+        <AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(
         const AndroidNotificationChannel(
@@ -46,6 +47,8 @@ class NotificationService {
           _androidChannelName,
           description: 'Default channel for emergency alerts',
           importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
         ),
       );
     }
@@ -53,18 +56,60 @@ class NotificationService {
     // Get FCM token
     String? token = await _fcm.getToken();
     debugPrint('FCM Token: $token');
+
+    // Auto-save token if user is logged in
+    if (token != null) {
+      await _autoSaveToken(token);
+    }
+
+    // Listen for token refresh
+    _fcm.onTokenRefresh.listen((newToken) {
+      debugPrint('FCM Token refreshed: $newToken');
+      _autoSaveToken(newToken);
+    });
+
     return token;
   }
 
-  Future<void> saveHelperToken(String helperId, String token) async {
-    await FirebaseFirestore.instance
-        .collection('helpers')
-        .doc(helperId)
-        .set({
-      'fcmToken': token,
-      'isActive': true,
-      'lastUpdated': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  Future<void> _autoSaveToken(String token) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      await saveUserToken(user.uid, token);
+      debugPrint('Token auto-saved for user: ${user.uid}');
+    } catch (e) {
+      debugPrint('Error auto-saving token: $e');
+    }
+  }
+
+  Future<void> saveUserToken(String userId, String token) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .set({
+        'fcmToken': token,
+        'lastTokenUpdate': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      debugPrint('User token saved successfully');
+    } catch (e) {
+      debugPrint('Error saving user token: $e');
+    }
+  }
+
+  Future<void> removeUserToken(String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update({
+        'fcmToken': FieldValue.delete(),
+      });
+      debugPrint('User token removed successfully');
+    } catch (e) {
+      debugPrint('Error removing user token: $e');
+    }
   }
 
   void handleForegroundMessages() {
@@ -74,9 +119,8 @@ class NotificationService {
 
       final notif = message.notification;
       if (notif != null) {
-        // show a local notification using the channel we created
         _localNotif.show(
-          0,
+          message.hashCode,
           notif.title,
           notif.body,
           NotificationDetails(
@@ -85,8 +129,10 @@ class NotificationService {
               _androidChannelName,
               importance: Importance.max,
               priority: Priority.high,
-              // optionally set icon, sound, etc.
               icon: '@mipmap/ic_launcher',
+              sound: const RawResourceAndroidNotificationSound('notification'),
+              playSound: true,
+              enableVibration: true,
             ),
           ),
           payload: message.data['requestId'] ?? '',
@@ -97,8 +143,8 @@ class NotificationService {
 
   void handleNotificationTaps() {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('A new onMessageOpenedApp event was published!');
-      // navigate to the emergency details screen, using message.data['requestId']
+      debugPrint('Notification tapped! Request ID: ${message.data['requestId']}');
+      // TODO: Navigate to emergency details screen
     });
   }
 }
