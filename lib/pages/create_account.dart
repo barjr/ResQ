@@ -223,7 +223,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
 
       // 5) Send email verification
 
-      // 5) Send email verification
       try {
         await user.sendEmailVerification();
       } on FirebaseAuthException catch (e) {
