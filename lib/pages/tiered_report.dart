@@ -58,20 +58,24 @@ class _TieredReportPageState extends State<TieredReportPage> {
         : Severity.urgent;
 
     final reporter = _currentReporterName();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final reporterUid = currentUser?.uid;
 
     try {
       // Persist to Firestore (so other devices/helpers see it)
       await FirebaseFirestore.instance.collection('emergency_requests').add({
-        'reporterName': reporter,
-        'description': _descCtrl.text.trim(),
-        'location': _locationCtrl.text.trim().isEmpty
-            ? null
-            : _locationCtrl.text.trim(),
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'severity': severity.name, // 'minor'|'urgent'
-        'source': 'report',
-      });
+  'reporterUid': reporterUid,       // NEW
+  'reporterName': reporter,
+  'description': _descCtrl.text.trim(),
+  'location': _locationCtrl.text.trim().isEmpty
+      ? null
+      : _locationCtrl.text.trim(),
+  'timestamp': FieldValue.serverTimestamp(),
+  'status': 'pending',
+  'severity': severity.name, // 'minor'|'urgent'
+  'source': 'report',
+});
+
 
       // Still add to in-memory store for immediate local visibility
       RequestStore.instance.addRequest(

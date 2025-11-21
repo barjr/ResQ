@@ -1,8 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:resq/models/help_request.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:resq/pages/home.dart';
-import 'package:resq/services/request_store.dart';
+import 'package:resq/pages/emergency_detail_page.dart';
 
 class HelperViewPage extends StatefulWidget {
   const HelperViewPage({super.key});
@@ -12,45 +11,46 @@ class HelperViewPage extends StatefulWidget {
 }
 
 class _HelperViewPageState extends State<HelperViewPage> {
-  late final StreamSubscription<List<HelpRequest>> _sub;
-  List<HelpRequest> _requests = [];
+  //No more RequestStore subscription – we read directly from Firestore.
 
-  @override
-  void initState() {
-    super.initState();
-    _requests = RequestStore.instance.snapshot();
-    _sub = RequestStore.instance.stream.listen((list) {
-      setState(() => _requests = list);
-    });
-  }
+  Future<void> _acceptRequest(
+    BuildContext context,
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final data = doc.data() ?? {};
+    final reporterName = (data['reporterName'] ?? 'Unknown') as String;
+    final severity = (data['severity'] ?? 'critical') as String?;
 
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
-  }
-
-  void _acceptRequest(int index) {
-    final req = _requests[index];
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Accept Request'),
-        // ---------- Include severity in dialog text -------------------
-        content: Text('Accept ${_severityLabel(req.severity)} request from ${req.reporterName}?',),
-        // -------------------------------------------------------------------
+        content: Text(
+          'Accept ${_severityLabel(severity)} request from $reporterName?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('You accepted ${req.reporterName}')),
-              );
-              RequestStore.instance.removeRequest(req.id);
+
+              try {
+                // Mark as accepted (no exclusivity; just a status update)
+                await doc.reference.update({'status': 'accepted'});
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('You accepted $reporterName')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to accept: $e')),
+                );
+              }
             },
             child: const Text('Accept'),
           ),
@@ -91,30 +91,87 @@ class _HelperViewPageState extends State<HelperViewPage> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
+
+              //Firestore list of emergencies
               Expanded(
-                child: _requests.isEmpty
-                    ? const Center(child: Text('No pending requests'))
-                    : ListView.separated(
-                        itemCount: _requests.length,
-                        separatorBuilder: (context, index) => const Divider(),
-                        itemBuilder: (context, index) {
-                          final r = _requests[index];
-                          return ListTile(
-                            // ---------- Show severity chip ---------------
-                            leading: _severityChip(r.severity),
-                            // ---------------------------------------------------
-                            title: Text(r.reporterName),
-                            subtitle: Text('${r.location ?? 'unknown location'} — ${r.description}'),
-                            trailing: ElevatedButton(
-                              onPressed: () => _acceptRequest(index),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFC3B3C),
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('emergency_requests')
+                      .orderBy('timestamp', descending: true)
+                      .snapshots(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                    if (snap.hasError) {
+                      return Center(
+                        child: Text('Error: ${snap.error}'),
+                      );
+                    }
+
+                    final docs = snap.data?.docs ?? [];
+                    if (docs.isEmpty) {
+                      return const Center(
+                        child: Text('No pending requests'),
+                      );
+                    }
+
+                    return ListView.separated(
+                      itemCount: docs.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final d = docs[index];
+                        final data = d.data();
+                        final reporterName =
+                            (data['reporterName'] ?? 'Unknown') as String;
+                        final description =
+                            (data['description'] ?? '') as String;
+                        final location =
+                            (data['location'] ?? 'unknown location') as String?;
+                        final severity =
+                            (data['severity'] ?? 'critical') as String?;
+                        final status =
+                            (data['status'] ?? 'pending') as String;
+
+                        return ListTile(
+                          onTap: () {
+                            // 👉 Tap card -> detailed emergency page
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => EmergencyDetailPage(
+                                  requestId: d.id,
+                                  data: data,
+                                ),
                               ),
-                              child: const Text('Accept', style: TextStyle(color: Colors.white)),
+                            );
+                          },
+
+                          // Severity chip on the left
+                          leading: _severityChip(severity),
+
+                          title: Text(reporterName),
+                          subtitle: Text(
+                            '${location ?? 'unknown location'} — ${_preview(description)}\nStatus: ${status.toUpperCase()}',
+                          ),
+
+                          trailing: ElevatedButton(
+                            onPressed: () => _acceptRequest(context, d),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFC3B3C),
                             ),
-                          );
-                        },
-                      ),
+                            child: const Text(
+                              'Accept',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -124,25 +181,31 @@ class _HelperViewPageState extends State<HelperViewPage> {
   }
 
   // ---------- Severity label/chip helpers -------------------------------
-  String _severityLabel(Severity s) {
-    if (s == Severity.minor) return 'MINOR';
-    if (s == Severity.urgent) return 'URGENT';
-    if (s == Severity.critical) return 'CRITICAL';
-    return 'UNKNOWN';
+
+  String _severityLabel(String? s) {
+    switch (s) {
+      case 'minor':
+        return 'MINOR';
+      case 'urgent':
+        return 'URGENT';
+      case 'critical':
+      default:
+        return 'CRITICAL';
+    }
   }
 
-  Widget _severityChip(Severity s) {
+  Widget _severityChip(String? s) {
     final label = _severityLabel(s);
-
     Color bg = const Color(0xFFE0E0E0);
     Color fg = const Color(0xFF424242);
-    if (s == Severity.minor) {
+
+    if (s == 'minor') {
       bg = const Color(0xFFE8F5E9); // light green
       fg = const Color(0xFF2E7D32);
-    } else if (s == Severity.urgent) {
+    } else if (s == 'urgent') {
       bg = const Color(0xFFFFF3E0); // light orange
       fg = const Color(0xFFEF6C00);
-    } else if (s == Severity.critical) {
+    } else if (s == 'critical') {
       bg = const Color(0xFFFFEBEE); // light red
       fg = const Color(0xFFC62828);
     }
@@ -164,5 +227,15 @@ class _HelperViewPageState extends State<HelperViewPage> {
       ),
     );
   }
-  // ---------------------------------------------------------------------------
+
+  String _preview(String text, {int words = 6}) {
+    final tokens = text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    if (tokens.isEmpty) return '(No description)';
+    final head = tokens.take(words).join(' ');
+    return tokens.length > words ? '$head…' : head;
+  }
 }
