@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/pages/medical_documents_page.dart';
-/*ONLY FOR ADMIN??*/
-
 class CustomerViewPage extends StatelessWidget {
   const CustomerViewPage({super.key});
 
