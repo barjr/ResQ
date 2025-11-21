@@ -44,18 +44,18 @@ class _DashboardPageState extends State<DashboardPage> {
     // bottom navigation bar. Note the actual index value depends on whether
     // `isAdmin` is set (Roles may insert at index 1).
     if (index == (widget.isAdmin ? 2 : 1)) {
-  Navigator.of(context)
-      .push(
-        MaterialPageRoute(
-          builder: (_) => const UserSettingsPage(),
-        ),
-      )
-      .then((_) {
-        setState(() {
-          _selectedIndex = 0;
-        });
-      });
-}
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => const UserSettingsPage(),
+            ),
+          )
+          .then((_) {
+            setState(() {
+              _selectedIndex = 0;
+            });
+          });
+    }
     // Roles tab for admins: when an admin taps the Roles tab (index 1)
     // we push the `AdminViewPage` which contains the role-management UI.
     // We then reset the selected index back to Home when the admin returns.
