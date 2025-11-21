@@ -9,6 +9,7 @@ import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart';
 import 'package:resq/pages/tiered_report.dart';
 import 'package:resq/services/notification_service.dart';
+import 'user_settings_page.dart';
 
 // Dashboard: central landing page for signed-in users.
 // - Shows an SOS quick action and quick links to Customer/Helper views.
