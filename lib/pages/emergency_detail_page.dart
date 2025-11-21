@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 
 class EmergencyDetailPage extends StatelessWidget {
@@ -366,19 +369,65 @@ class _MedicalDocumentsSection extends StatelessWidget {
                     final data = d.data();
                     final fileName = (data['fileName'] ?? 'Unknown') as String;
                     return ListTile(
-                      title: Text(fileName),
-                      trailing: const Icon(Icons.open_in_new),
-                      onTap: () {
-                        // TODO: fetch Storage download URL and open with url_launcher
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Opening documents coming soon (prototype).',
-                            ),
-                          ),
-                        );
-                      },
-                    );
+  title: Text(fileName),
+  trailing: const Icon(Icons.open_in_new),
+  onTap: () async {
+    final storagePath = data['storagePath'] as String?;
+    final downloadUrl = data['downloadUrl'] as String?;
+
+    if (storagePath == null && downloadUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No storage path / URL saved for this document.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      String urlToOpen;
+
+      if (downloadUrl != null && downloadUrl.isNotEmpty) {
+        urlToOpen = downloadUrl;
+      } else {
+        // Look up download URL from Firebase Storage
+        final ref = FirebaseStorage.instance.ref(storagePath!);
+        urlToOpen = await ref.getDownloadURL();
+      }
+
+      final uri = Uri.parse(urlToOpen);
+
+      // Try external app first (browser / PDF viewer)
+      bool launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      // Fallback to in-app webview if external app isn’t available
+      if (!launched) {
+        launched = await launchUrl(
+          uri,
+          mode: LaunchMode.inAppWebView,
+        );
+      }
+
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open this document on this device.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to open document: $e'),
+        ),
+      );
+    }
+  },
+);
                   }).toList(),
           ),
         );
