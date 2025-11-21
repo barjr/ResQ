@@ -4,8 +4,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-//import 'package:resq/pages/mfa_enrollment.dart';
-//import 'package:resq/services/role_router.dart';
 import 'package:resq/pages/verify_email.dart';
 
 final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
