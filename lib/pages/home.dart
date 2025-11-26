@@ -31,26 +31,18 @@ Future<void> _handleLogin() async {
   setState(() => _isLoading = true);
 
   try {
-    final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+    // First factor: email + password
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
 
-    final u = cred.user;
-    if (u == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed: no user returned')),
-      );
-      return;
-    }
-
-    // MFA enrollment requirement (your helper)
-    final ok = await MfaEnrollment.requireAndEnrollIfNeeded(
-      context,
-      user: u,
-    );
+    // If we got here with no MFA exception, user is fully signed in.
+    final user = FirebaseAuth.instance.currentUser!;
+    // Enforce “must be enrolled” rule:
+    final ok = await MfaEnrollment.requireAndEnrollIfNeeded(context, user: user);
     if (!ok) {
+      // User bailed on enrollment – boot them back out
       await FirebaseAuth.instance.signOut();
       return;
     }
@@ -59,19 +51,15 @@ Future<void> _handleLogin() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Login successful!')),
     );
-    await routeByRole(context, u);
-
+    await routeByRole(context, user);
   } on FirebaseAuthMultiFactorException catch (e) {
-    // <--- this is the correct exception type
-    final resolver = e.resolver; // has the MultiFactorResolver
-
+    // User *has* MFA set up – we need the SMS challenge
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SmsMfaSignInPage(resolver: resolver),
+        builder: (_) => SmsMfaSignInPage(exception: e),
       ),
     );
-
   } on FirebaseAuthException catch (e) {
     final msg = _friendlyError(e);
     if (!mounted) return;
@@ -88,7 +76,8 @@ Future<void> _handleLogin() async {
   }
 }
 
- 
+
+
   String _friendlyError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':

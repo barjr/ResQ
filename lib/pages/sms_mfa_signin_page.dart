@@ -1,27 +1,38 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:resq/services/role_router.dart';
 
 class SmsMfaSignInPage extends StatefulWidget {
-  final MultiFactorResolver resolver;
+  final FirebaseAuthMultiFactorException exception;
 
-  const SmsMfaSignInPage({super.key, required this.resolver});
+  const SmsMfaSignInPage({super.key, required this.exception});
 
   @override
   State<SmsMfaSignInPage> createState() => _SmsMfaSignInPageState();
 }
 
 class _SmsMfaSignInPageState extends State<SmsMfaSignInPage> {
+  late final MultiFactorResolver _resolver;
+  PhoneMultiFactorInfo? _phoneHint;
+
   final _codeCtrl = TextEditingController();
   String? _verificationId;
   bool _sending = false;
   bool _verifying = false;
-  String? _error;
+  String? _status;
 
   @override
   void initState() {
     super.initState();
-    _startSmsFlow();
+    _resolver = widget.exception.resolver;
+
+    // Assume only one phone factor for now.
+    _phoneHint = _resolver.hints.firstWhere(
+      (h) => h is PhoneMultiFactorInfo,
+      orElse: () => throw StateError('No phone factor found'),
+    ) as PhoneMultiFactorInfo;
+
+    _sendCode();
   }
 
   @override
@@ -30,86 +41,114 @@ class _SmsMfaSignInPageState extends State<SmsMfaSignInPage> {
     super.dispose();
   }
 
-  PhoneMultiFactorInfo get _phoneFactor {
-    // For now assume exactly one phone factor
-    return widget.resolver.hints.firstWhere(
-      (f) => f is PhoneMultiFactorInfo,
-    ) as PhoneMultiFactorInfo;
-  }
-
-Future<void> _startSmsFlow() async {
+  Future<void> _sendCode() async {
     setState(() {
       _sending = true;
-      _error = null;
+      _status = null;
     });
 
     try {
+      final session = _resolver.session;
+      final hint = _phoneHint;
+
       await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: _phoneFactor.phoneNumber!,
-        multiFactorSession: widget.resolver.session,
-        multiFactorInfo: _phoneFactor,
+        multiFactorSession: session,
+        multiFactorInfo: hint, // <-- IMPORTANT: no phoneNumber here
         verificationCompleted: (PhoneAuthCredential cred) async {
-          // auto-verification path
+          // Android auto-verification
           await _completeSignIn(cred);
         },
-        verificationFailed: (e) {
-          setState(() => _error = e.message ?? 'SMS verification failed');
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() {
+            _status = 'Verification failed: ${e.message}';
+          });
         },
-        codeSent: (verificationId, _) {
-          setState(() => _verificationId = verificationId);
+        codeSent: (String verificationId, int? _) {
+          setState(() {
+            _verificationId = verificationId;
+            _status = 'Code sent to ${hint?.phoneNumber ?? "your phone"}.';
+          });
         },
-        codeAutoRetrievalTimeout: (_) {},
+        codeAutoRetrievalTimeout: (String verificationId) {
+          setState(() {
+            _verificationId = verificationId;
+          });
+        },
         timeout: const Duration(seconds: 60),
       );
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() {
+        _status = 'Error sending code: $e';
+      });
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
-  Future<void> _submitCode() async {
-    if (_verificationId == null) return;
-
+  Future<void> _completeSignIn(PhoneAuthCredential cred) async {
     setState(() {
       _verifying = true;
-      _error = null;
+      _status = null;
     });
 
     try {
-      final cred = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: _codeCtrl.text.trim(),
+      await _resolver.resolveSignIn(
+        PhoneMultiFactorGenerator.getAssertion(cred),
       );
 
-      await _completeSignIn(cred);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _status = 'Sign-in completed, but no user found.';
+        });
+        return;
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login successful (MFA).')),
+      );
+      await routeByRole(context, user);
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Verification failed');
+      setState(() {
+        _status = 'MFA sign-in failed: ${e.message}';
+      });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() {
+        _status = 'Unexpected error: $e';
+      });
     } finally {
       if (mounted) setState(() => _verifying = false);
     }
   }
 
-Future<void> _completeSignIn(PhoneAuthCredential cred) async {
-    final assertion = PhoneMultiFactorGenerator.getAssertion(cred);
-    final userCred = await widget.resolver.resolveSignIn(assertion);
-    final user = userCred.user;
-
-    if (!mounted) return;
-
-    if (user == null) {
-      setState(() => _error = 'Sign-in resolved but no user returned.');
+  Future<void> _onConfirmPressed() async {
+    if (_verificationId == null) {
+      setState(() {
+        _status = 'Request a code first.';
+      });
       return;
     }
 
-    await routeByRole(context, user);
+    final smsCode = _codeCtrl.text.trim();
+    if (smsCode.length < 4) {
+      setState(() {
+        _status = 'Enter the SMS code.';
+      });
+      return;
+    }
+
+    final cred = PhoneAuthProvider.credential(
+      verificationId: _verificationId!,
+      smsCode: smsCode,
+    );
+    await _completeSignIn(cred);
   }
 
   @override
   Widget build(BuildContext context) {
-    final maskedPhone = _phoneFactor.phoneNumber ?? 'your phone';
+    final maskedPhone = _phoneHint?.phoneNumber ?? 'your phone';
 
     return Scaffold(
       appBar: AppBar(
@@ -124,7 +163,7 @@ Future<void> _completeSignIn(PhoneAuthCredential cred) async {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: SizedBox(
             width: 300,
             child: Column(
@@ -132,48 +171,37 @@ Future<void> _completeSignIn(PhoneAuthCredential cred) async {
               children: [
                 const Icon(
                   Icons.health_and_safety,
-                  size: 100,
+                  size: 80,
                   color: Color(0xFFFC3B3C),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Two-Step Verification',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  'Two-step verification',
+                  style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'We sent a code to:\n$maskedPhone',
+                  'We sent a code to $maskedPhone. Enter it below to finish signing in.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _codeCtrl,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    labelText: 'SMS Code',
+                    labelText: 'SMS code',
                     prefixIcon: Icon(Icons.sms),
                   ),
+                  keyboardType: TextInputType.number,
+                  enabled: !_verifying,
                 ),
-                const SizedBox(height: 8),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: (_verifying || _sending) ? null : _submitCode,
+                    onPressed: _verifying ? null : _onConfirmPressed,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFC3B3C),
                       foregroundColor: Colors.white,
@@ -203,9 +231,17 @@ Future<void> _completeSignIn(PhoneAuthCredential cred) async {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: _sending ? null : _startSmsFlow,
-                  child: const Text('Resend code'),
+                  onPressed: _sending ? null : _sendCode,
+                  child: Text(_sending ? 'Resending…' : 'Resend code'),
                 ),
+                if (_status != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _status!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
               ],
             ),
           ),
