@@ -1,12 +1,5 @@
-/*
-
-  THIS PAGE IS GOING TO BE REPLACED BY SMS_ENROLLMENT.DART
-  THIS WAS SUPPOSED TO BE FOR TOTP SETUP WHICH I MIGHT STILL USE IF GOOGLE CLOUD STOPS PLAYING LIKE THAT
-
-  */
-
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class MfaEnrollPage extends StatefulWidget {
   const MfaEnrollPage({super.key});
@@ -44,11 +37,31 @@ class _MfaEnrollPageState extends State<MfaEnrollPage> {
     if (digits.startsWith('+')) return raw;
     return '+$digits';
   }
-
   Future<void> _enrollSms() async {
-    setState(() { _status = null; _enrolling = true; });
+    setState(() {
+      _status = null;
+      _enrolling = true;
+    });
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) { setState(() { _status = 'Not signed in.'; _enrolling = false; }); return; }
+    if (user == null) {
+      setState(() {
+        _status = 'Not signed in.';
+        _enrolling = false;
+      });
+      return;
+    }
+
+    // 🔒 New: require verified email before SMS enrollment
+    if (!user.emailVerified) {
+      await user.sendEmailVerification();
+      setState(() {
+        _status = 'We sent a verification email to ${user.email ?? ''}. '
+            'Please verify your email, then return here to set up SMS.';
+        _enrolling = false;
+      });
+      return;
+    }
 
     try {
       final session = await user.multiFactor.getSession();
@@ -57,23 +70,38 @@ class _MfaEnrollPageState extends State<MfaEnrollPage> {
         phoneNumber: _toE164(_phoneCtrl.text.trim()),
         multiFactorSession: session,
         verificationCompleted: (cred) async {
-          // Instant verification or auto-retrieval
           final assertion = PhoneMultiFactorGenerator.getAssertion(cred);
-          await user.multiFactor.enroll(assertion, displayName: 'Primary phone');
-          setState(() { _status = 'SMS factor enrolled ✓'; _enrolling = false; });
+          await user.multiFactor.enroll(
+            assertion,
+            displayName: 'Primary phone',
+          );
+          setState(() {
+            _status = 'SMS factor enrolled ✓';
+            _enrolling = false;
+          });
         },
         verificationFailed: (e) {
-          setState(() { _status = 'SMS verify failed: ${e.message}'; _enrolling = false; });
+          setState(() {
+            _status = 'SMS verify failed: ${e.message}';
+            _enrolling = false;
+          });
         },
         codeSent: (vid, _) async {
-          setState(() { _verificationId = vid; _status = 'Code sent. Check SMS.'; _enrolling = false; });
+          setState(() {
+            _verificationId = vid;
+            _status = 'Code sent. Check SMS.';
+            _enrolling = false;
+          });
         },
         codeAutoRetrievalTimeout: (_) {},
         timeout: const Duration(seconds: 60),
         forceResendingToken: null,
       );
     } catch (e) {
-      setState(() { _status = 'Enroll error: $e'; _enrolling = false; });
+      setState(() {
+        _status = 'Enroll error: $e';
+        _enrolling = false;
+      });
     }
   }
 

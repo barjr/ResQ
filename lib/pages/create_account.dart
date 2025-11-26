@@ -4,7 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:resq/pages/verify_email.dart';
+import 'package:resq/pages/mfa_enroll_page.dart';
 import 'package:resq/services/notification_service.dart';
 
 final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
@@ -246,14 +246,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         ),
       );
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => VerifyEmailPage(
-            email: user.email ?? _emailCtrl.text.trim(),
-            phonePrefill: _phoneCtrl.text.trim(),
-          ),
-        ),
-      );
+      Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const MfaEnrollPage(),
+      ),
+    );
     } catch (e) {
       final msg = _friendlyError(e);
       if (!mounted) return;
