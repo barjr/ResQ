@@ -58,38 +58,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /* Future<void> _handleCreateAccount() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
-
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created! You are signed in.')),
-      );
-      //take you to Dashboard automatically
-    } on FirebaseAuthException catch (e) {
-      final msg = _friendlyError(e);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $msg')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  } */
-
-  //TODO: boilerplate, change for security
   String _friendlyError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':
