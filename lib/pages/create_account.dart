@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:resq/pages/mfa_enroll_page.dart';
+import 'package:resq/constants/mfa_whitelist.dart';
 import 'package:resq/services/notification_service.dart';
+import 'package:resq/services/role_router.dart';
 
 final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
 
@@ -247,7 +249,14 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
           content: Text('Account created! Check your email to verify.'),
         ),
       );
+final email = user?.email?.toLowerCase().trim();
 
+if (email != null && mfaBypassEmails.contains(email)) {
+  await routeByRole(context, user!);
+  return;
+}
+
+// Non-whitelisted → go to MFA
 Navigator.of(context).pushAndRemoveUntil(
   MaterialPageRoute(builder: (_) => const MfaEnrollPage()),
   (route) => false,

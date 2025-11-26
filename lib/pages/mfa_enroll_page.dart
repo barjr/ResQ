@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/services/role_router.dart';
+import 'package:resq/constants/mfa_whitelist.dart';
 
 class MfaEnrollPage extends StatefulWidget {
   const MfaEnrollPage({super.key});
@@ -31,10 +32,14 @@ class _MfaEnrollPageState extends State<MfaEnrollPage> {
   bool _totpEnrolled = false;
 
   @override
-  void initState() {
-    super.initState();
-    _refreshStatus();
-  }
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await _refreshStatus();
+    await _checkWhitelistBypass();
+  });
+}
+
 
   @override
   void dispose() {
@@ -52,6 +57,26 @@ class _MfaEnrollPageState extends State<MfaEnrollPage> {
     if (digits.startsWith('+')) return raw;
     return '+$digits';
   }
+
+  Future<void> _checkWhitelistBypass() async {
+  final user = FirebaseAuth.instance.currentUser;
+
+  if (user == null) return;
+
+  final email = user.email?.toLowerCase().trim();
+
+  if (email != null && mfaBypassEmails.contains(email)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('MFA bypass enabled for $email'),
+      ),
+    );
+
+    await routeByRole(context, user);
+  }
+}
+
+
 
   Future<void> _refreshStatus() async {
     final auth = FirebaseAuth.instance;
