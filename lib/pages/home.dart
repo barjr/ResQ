@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:resq/pages/create_account.dart';
+import 'package:resq/pages/sms_mfa_signin_page.dart';
+import 'package:resq/services/mfa_enrollment.dart';
 import 'package:resq/services/role_router.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,40 +26,69 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+Future<void> _handleLogin() async {
+  if (!_formKey.currentState!.validate()) return;
+  setState(() => _isLoading = true);
 
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+  try {
+    final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    final u = cred.user;
+    if (u == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login failed: no user returned')),
       );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Login successful!')));
-      // after successful signInWithEmailAndPassword:
-      final u = FirebaseAuth.instance.currentUser!;
-      await routeByRole(context, u);
-
-    } on FirebaseAuthException catch (e) {
-      final msg = _friendlyError(e);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: $msg')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      return;
     }
-  }
 
+    // MFA enrollment requirement (your helper)
+    final ok = await MfaEnrollment.requireAndEnrollIfNeeded(
+      context,
+      user: u,
+    );
+    if (!ok) {
+      await FirebaseAuth.instance.signOut();
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Login successful!')),
+    );
+    await routeByRole(context, u);
+
+  } on FirebaseAuthMultiFactorException catch (e) {
+    // <--- this is the correct exception type
+    final resolver = e.resolver; // has the MultiFactorResolver
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SmsMfaSignInPage(resolver: resolver),
+      ),
+    );
+
+  } on FirebaseAuthException catch (e) {
+    final msg = _friendlyError(e);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Login failed: $msg')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Login failed: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
+
+ 
   String _friendlyError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':
