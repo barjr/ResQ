@@ -221,7 +221,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
 
       // 5) Send email verification
 
-      try {
+    try {
         await user.sendEmailVerification();
       } on FirebaseAuthException catch (e) {
         if (e.code == 'too-many-requests') {
@@ -236,9 +236,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
             );
           }
         } else {
-          rethrow;
+          debugPrint('sendEmailVerification failed: ${e.code} ${e.message}');
+          // Don’t rethrow; just log and continue since the account is created.
         }
       }
+
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -246,11 +248,10 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         ),
       );
 
-      Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const MfaEnrollPage(),
-      ),
-    );
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (_) => const MfaEnrollPage()),
+  (route) => false,
+);
     } catch (e) {
       final msg = _friendlyError(e);
       if (!mounted) return;
