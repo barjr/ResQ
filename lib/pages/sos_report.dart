@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/services/summarizer.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -76,96 +75,63 @@ class _SosReportPageState extends State<SosReportPage> {
     });
   }
 
-  Future<void> _summarize() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSummarizing = true);
-    final summarizer = MockSummarizer();
-    final summary = await summarizer.summarize(
-      description: _descCtrl.text.trim(),
-      location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-    );
-    if (!mounted) return;
-    setState(() => _isSummarizing = false);
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('AI Summary'),
-        content: Text(summary),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-          // TextButton(
-          //   onPressed: () {
-          //     Navigator.of(context).pop();
-          //     // persist to in-memory store so helpers can see the request
-          //     try {
-          //       // use a placeholder reporter name for now
-          //       RequestStore.instance.addRequest(
-          //         reporterName: 'Anonymous',
-          //         description: _descCtrl.text.trim(),
-          //         location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-          //       );
-          //     } catch (e) {
-          //       // ignore: avoid_print
-          //       print('Failed to add request: $e');
-          //     }
-          //     ScaffoldMessenger.of(context).showSnackBar(
-          //       const SnackBar(content: Text('Report submitted')), 
-          //     );
-          //     Navigator.of(context).pop();
-          //   },
-          //   child: const Text('Submit'),
-
-          TextButton(
-            onPressed: () async {  // Add async here
-              Navigator.of(context).pop();
-              
-              try {
-                // Save to Firestore - this triggers the Cloud Function
-                await FirebaseFirestore.instance
-                  .collection('emergency_requests')
-                  .add({
-                    'reporterName': 'Anonymous',
-                    'description': _descCtrl.text.trim(),
-                    'location': _locationCtrl.text.trim().isEmpty 
-                      ? null 
-                      : _locationCtrl.text.trim(),
-                    'timestamp': FieldValue.serverTimestamp(),
-                    'status': 'pending',
-                  });
-                
-                // Still add to in-memory store for local use
-                RequestStore.instance.addRequest(
-                  reporterName: 'Anonymous',
-                  description: _descCtrl.text.trim(),
-                  location: _locationCtrl.text.trim().isEmpty 
+ Future<void> _summarize() async {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Confirm Submission'),
+      content: const Text('Are you sure you want to submit this emergency report?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.of(context).pop();
+            
+            try {
+              // Save to Firestore - this triggers the Cloud Function
+              await FirebaseFirestore.instance
+                .collection('emergency_requests')
+                .add({
+                  'reporterName': 'Anonymous',
+                  'description': _descCtrl.text.trim(),
+                  'location': _locationCtrl.text.trim().isEmpty 
                     ? null 
                     : _locationCtrl.text.trim(),
-                );
-                
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Emergency alert sent to helpers!')),
-                );
-                Navigator.of(context).pop();
-              } catch (e) {
-                print('Failed to submit request: $e');
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
-            },
-            child: const Text('Submit'),
-          ),
-          //),
-        ],
-      ),
-    );
-  }
+                  'timestamp': FieldValue.serverTimestamp(),
+                  'status': 'pending',
+                });
+              
+              // Still add to in-memory store for local use
+              RequestStore.instance.addRequest(
+                reporterName: 'Anonymous',
+                description: _descCtrl.text.trim(),
+                location: _locationCtrl.text.trim().isEmpty 
+                  ? null 
+                  : _locationCtrl.text.trim(),
+              );
+              
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Emergency alert sent to helpers!')),
+              );
+              Navigator.of(context).pop();
+            } catch (e) {
+              print('Failed to submit request: $e');
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: $e')),
+              );
+            }
+          },
+          child: const Text('Submit'),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +216,7 @@ class _SosReportPageState extends State<SosReportPage> {
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFC3B3C)),
                     child: _isSummarizing
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                        : const Text('Summarize & Submit', style: TextStyle(color: Colors.white),),
+                        : const Text('Submit', style: TextStyle(color: Colors.white),),
                   ),
                 ),
                 const SizedBox(height: 8),
