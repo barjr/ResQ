@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   firebase_core: ^4.1.0
-  firebase_auth: ^6.1.0
+  firebase_auth: ^6.0.2
   speech_to_text: ^7.3.0
   uuid: ^4.1.0
   firebase_messaging: ^16.0.3

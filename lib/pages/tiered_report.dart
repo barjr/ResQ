@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart' show Severity, Source;
