@@ -1,16 +1,10 @@
-# resq
+# ResQ
 
-A new Flutter project.
+ResQ is a smart alert system designed for any size event or venue. The system allows attendees to quickly request emergency help with a single tap of a button on their phone. Emergency responders and helpful bystanders receive real-time alerts that include interactive geolocation and a user provided description, along with guidance on the severity of the alert. The system improves emergency response times, enhances response coordination, and saves lives. 
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+Access instructions are included in the Group2_PeerTestingInstructions.pdf
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**Questions can be directed to hlligman@uwm.edu and bdeleo@uwm.edu**
