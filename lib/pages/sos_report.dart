@@ -283,7 +283,7 @@ Row(
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFC3B3C)),
                     child: _isSummarizing
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                        : const Text('Summarize & Submit', style: TextStyle(color: Colors.white),),
+                        : const Text('Submit', style: TextStyle(color: Colors.white),),
                   ),
                 ),
                 const SizedBox(height: 8),
