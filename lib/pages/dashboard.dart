@@ -8,6 +8,7 @@ import 'package:resq/pages/sos_report.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart';
 import 'package:resq/pages/tiered_report.dart';
+import 'package:resq/pages/user_settings_page.dart';
 import 'package:resq/services/notification_service.dart';
 
 // Dashboard: central landing page for signed-in users.
@@ -44,33 +45,17 @@ class _DashboardPageState extends State<DashboardPage> {
     // bottom navigation bar. Note the actual index value depends on whether
     // `isAdmin` is set (Roles may insert at index 1).
     if (index == (widget.isAdmin ? 2 : 1)) {
-      (Navigator.of(context)
+      Navigator.of(context)
           .push(
             MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(
-                  title: const Text('Settings'),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-                body: const Center(
-                  child: Text(
-                    'Under construction :(',
-                    style: TextStyle(fontSize: 30),
-                  ),
-                ),
-              ),
+              builder: (_) => const UserSettingsPage(),
             ),
           )
           .then((_) {
             setState(() {
               _selectedIndex = 0;
             });
-          }));
+          });
     }
     // Roles tab for admins: when an admin taps the Roles tab (index 1)
     // we push the `AdminViewPage` which contains the role-management UI.
@@ -227,7 +212,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 // regular user view per product requirement. Regular users
                 // only see the emergency reporting buttons above.
               ],
-
               // Show Customer and Helper view buttons to admins/helpers only
               if (!isRegular) ...[
                 // Customer view should be admin-only (helpers should not see it)
