@@ -46,11 +46,7 @@ class _DashboardPageState extends State<DashboardPage> {
     // `isAdmin` is set (Roles may insert at index 1).
     if (index == (widget.isAdmin ? 2 : 1)) {
       Navigator.of(context)
-          .push(
-            MaterialPageRoute(
-              builder: (_) => const UserSettingsPage(),
-            ),
-          )
+          .push(MaterialPageRoute(builder: (_) => const UserSettingsPage()))
           .then((_) {
             setState(() {
               _selectedIndex = 0;
@@ -538,33 +534,31 @@ class _DisclaimerAppBarBottom extends StatelessWidget
       ),
     );
   }
-  
+
   // This is for notifications??
   Future<void> _saveTokenIfHelperOrAdmin() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-    // Get user's role from custom claims
-    final idTokenResult = await user.getIdTokenResult(true);
-    final role = idTokenResult.claims?['role'] as String?;
-    
-    debugPrint('User role: $role');
+      // Get user's role from custom claims
+      final idTokenResult = await user.getIdTokenResult(true);
+      final role = idTokenResult.claims?['role'] as String?;
 
-    // Save token for all users (the Cloud Function will filter by role)
-    final notifService = NotificationService();
-    final token = await notifService.initialize();
-    
-    if (token != null) {
-      await notifService.saveUserToken(user.uid, token);
-      debugPrint('Token saved for user: ${user.uid}, role: $role');
-    } else {
-      debugPrint('No FCM token available');
+      debugPrint('User role: $role');
+
+      // Save token for all users (the Cloud Function will filter by role)
+      final notifService = NotificationService();
+      final token = await notifService.initialize();
+
+      if (token != null) {
+        await notifService.saveUserToken(user.uid, token);
+        debugPrint('Token saved for user: ${user.uid}, role: $role');
+      } else {
+        debugPrint('No FCM token available');
+      }
+    } catch (e) {
+      debugPrint('Error saving token: $e');
     }
-  } catch (e) {
-    debugPrint('Error saving token: $e');
   }
 }
-
-}
-
