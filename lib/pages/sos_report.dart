@@ -3,8 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:resq/services/location_service.dart';
 import 'package:resq/services/request_store.dart';
-import 'package:resq/services/summarizer.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt; 
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class SosReportPage extends StatefulWidget {
   const SosReportPage({super.key});
@@ -23,6 +22,7 @@ class _SosReportPageState extends State<SosReportPage> {
   bool _listening = false;
   double? _lat;
   double? _lng;
+
   @override
   void dispose() {
     _descCtrl.dispose();
@@ -39,10 +39,12 @@ class _SosReportPageState extends State<SosReportPage> {
 
   Future<void> _initSpeech() async {
     try {
-      _speechAvailable = await _speech.initialize(onError: (e) {
-        // ignore: avoid_print
-        print('Speech init error: $e');
-      });
+      _speechAvailable = await _speech.initialize(
+        onError: (e) {
+          // ignore: avoid_print
+          print('Speech init error: $e');
+        },
+      );
       setState(() {});
     } catch (e) {
       // ignore: avoid_print
@@ -64,109 +66,81 @@ class _SosReportPageState extends State<SosReportPage> {
     }
 
     setState(() => _listening = true);
-    await _speech.listen(onResult: (result) {
-      setState(() {
-        // append recognized words to existing text
-        final recognized = result.recognizedWords;
-        if (_descCtrl.text.trim().isEmpty) {
-          _descCtrl.text = recognized;
-        } else {
-          _descCtrl.text = '${_descCtrl.text} $recognized';
-        }
-        // move cursor to end
-        _descCtrl.selection = TextSelection.fromPosition(TextPosition(offset: _descCtrl.text.length));
-      });
-    });
+    await _speech.listen(
+      onResult: (result) {
+        setState(() {
+          final recognized = result.recognizedWords;
+          if (_descCtrl.text.trim().isEmpty) {
+            _descCtrl.text = recognized;
+          } else {
+            _descCtrl.text = '${_descCtrl.text} $recognized';
+          }
+          _descCtrl.selection = TextSelection.fromPosition(
+            TextPosition(offset: _descCtrl.text.length),
+          );
+        });
+      },
+    );
   }
 
   Future<void> _summarize() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSummarizing = true);
-    final summarizer = MockSummarizer();
-    final summary = await summarizer.summarize(
-      description: _descCtrl.text.trim(),
-      location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-    );
-    if (!mounted) return;
-    setState(() => _isSummarizing = false);
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('AI Summary'),
-        content: Text(summary),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-          TextButton(
-            onPressed: () async {  // Add async here
-              Navigator.of(context).pop();
-              
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final reporterUid = currentUser?.uid;
+      final reporterName = (() {
+        if (currentUser == null) return 'Anonymous';
+        if (currentUser.displayName != null &&
+            currentUser.displayName!.trim().isNotEmpty) {
+          return currentUser.displayName!.trim();
+        }
+        final email = currentUser.email;
+        if (email != null && email.contains('@')) {
+          return email.split('@').first;
+        }
+        return 'User';
+      })();
 
+      await FirebaseFirestore.instance.collection('emergency_requests').add({
+        'reporterName': reporterName,
+        'reporterUid': reporterUid,
+        'description': _descCtrl.text.trim(),
+        'location': _locationCtrl.text.trim().isEmpty
+            ? null
+            : _locationCtrl.text.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'lat': _lat,
+        'lng': _lng,
+      });
 
-              try {
-                final currentUser = FirebaseAuth.instance.currentUser;
-final reporterUid = currentUser?.uid;
-final reporterName = (() {
-  if (currentUser == null) return 'Anonymous';
-  if (currentUser.displayName != null &&
-      currentUser.displayName!.trim().isNotEmpty) {
-    return currentUser.displayName!.trim();
-  }
-  final email = currentUser.email;
-  if (email != null && email.contains('@')) {
-    return email.split('@').first;
-  }
-  return 'User';
-})();
-                // Save to Firestore - this triggers the Cloud Function
-await FirebaseFirestore.instance
-    .collection('emergency_requests')
-    .add({
-  'reporterName': reporterName,
-  'reporterUid': reporterUid, // may be null for anonymous
-  'description': _descCtrl.text.trim(),
-  'location': _locationCtrl.text.trim().isEmpty 
-      ? null 
-      : _locationCtrl.text.trim(),
-  'timestamp': FieldValue.serverTimestamp(),
-  'status': 'pending',
+      RequestStore.instance.addRequest(
+        reporterName: reporterName,
+        description: _descCtrl.text.trim(),
+        location: _locationCtrl.text.trim().isEmpty
+            ? null
+            : _locationCtrl.text.trim(),
+      );
 
-  // precise coordinates (if we have them)
-  'lat': _lat,
-  'lng': _lng,
-});
-                
-                // Still add to in-memory store for local use
-                RequestStore.instance.addRequest(
-  reporterName: reporterName,
-  description: _descCtrl.text.trim(),
-  location: _locationCtrl.text.trim().isEmpty 
-      ? null 
-      : _locationCtrl.text.trim(),
-);
-                
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Emergency alert sent to helpers!')),
-                );
-                Navigator.of(context).pop();
-              } catch (e) {
-                print('Failed to submit request: $e');
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
-            },
-            child: const Text('Submit'),
-          ),
-          //),
-        ],
-      ),
-    );
+      if (!mounted) return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Emergency alert sent to helpers!')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to submit request: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => _isSummarizing = false);
+    }
   }
 
   @override
@@ -174,7 +148,10 @@ await FirebaseFirestore.instance
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Describe your emergency', style: TextStyle(color: Colors.white),),
+        title: const Text(
+          'Describe your emergency',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFFFC3B3C),
         actions: [
           IconButton(
@@ -207,7 +184,9 @@ await FirebaseFirestore.instance
                           border: OutlineInputBorder(),
                           labelText: 'Describe the situation',
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Please describe the situation' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Please describe the situation'
+                            : null,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -223,11 +202,15 @@ await FirebaseFirestore.instance
                         SizedBox(
                           width: 80,
                           child: Text(
-                            _speechAvailable ? (_listening ? 'Listening' : 'Ready') : 'Unavailable',
+                            _speechAvailable
+                                ? (_listening ? 'Listening' : 'Ready')
+                                : 'Unavailable',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
-                              color: _speechAvailable ? Colors.grey : Colors.red,
+                              color: _speechAvailable
+                                  ? Colors.grey
+                                  : Colors.red,
                             ),
                           ),
                         ),
@@ -236,60 +219,84 @@ await FirebaseFirestore.instance
                   ],
                 ),
                 const SizedBox(height: 12),
-Row(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Expanded(
-      child: TextFormField(
-        controller: _locationCtrl,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          labelText: 'Location (optional)',
-          hintText: 'e.g., near 5th Ave & Pine St',
-        ),
-      ),
-    ),
-    const SizedBox(width: 8),
-    IconButton(
-      tooltip: 'Use my current location',
-      icon: const Icon(Icons.my_location),
-      onPressed: () async {
-        final pos = await LocationService.getCurrentPosition();
-        if (!mounted) return;
-        if (pos == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Unable to get location. Check permissions.'),
-            ),
-          );
-          return;
-        }
-        setState(() {
-          _lat = pos.latitude;
-          _lng = pos.longitude;
-          // Put something human-readable into the text field
-          _locationCtrl.text = 'Lat: ${pos.latitude.toStringAsFixed(5)}, '
-              'Lng: ${pos.longitude.toStringAsFixed(5)}';
-        });
-      },
-    ),
-  ],
-),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _locationCtrl,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Location (optional)',
+                          hintText: 'e.g., near 5th Ave & Pine St',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Use my current location',
+                      icon: const Icon(Icons.my_location),
+                      onPressed: () async {
+                        final pos = await LocationService.getCurrentPosition();
+                        if (!mounted) return;
+                        if (pos == null) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Unable to get location. Check permissions.',
+                                  ),
+                                ),
+                              );
+                            }
+                          });
+                          return;
+                        }
+                        setState(() {
+                          _lat = pos.latitude;
+                          _lng = pos.longitude;
+                          // Put something human-readable into the text field
+                          _locationCtrl.text =
+                              'Lat: ${pos.latitude.toStringAsFixed(5)}, '
+                              'Lng: ${pos.longitude.toStringAsFixed(5)}';
+                        });
+                      },
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
                     onPressed: _isSummarizing ? null : _summarize,
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFC3B3C)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFC3B3C),
+                    ),
                     child: _isSummarizing
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                        : const Text('Submit', style: TextStyle(color: Colors.white),),
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Submit',
+                            style: TextStyle(color: Colors.white),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.black),),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.black),
+                  ),
                 ),
               ],
             ),

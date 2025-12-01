@@ -27,10 +27,12 @@ class _SmsMfaSignInPageState extends State<SmsMfaSignInPage> {
     _resolver = widget.exception.resolver;
 
     // Assume only one phone factor for now.
-    _phoneHint = _resolver.hints.firstWhere(
-      (h) => h is PhoneMultiFactorInfo,
-      orElse: () => throw StateError('No phone factor found'),
-    ) as PhoneMultiFactorInfo;
+    _phoneHint =
+        _resolver.hints.firstWhere(
+              (h) => h is PhoneMultiFactorInfo,
+              orElse: () => throw StateError('No phone factor found'),
+            )
+            as PhoneMultiFactorInfo;
 
     _sendCode();
   }
@@ -106,9 +108,9 @@ class _SmsMfaSignInPageState extends State<SmsMfaSignInPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login successful (MFA).')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Login successful (MFA).')));
       await routeByRole(context, user);
     } on FirebaseAuthException catch (e) {
       setState(() {

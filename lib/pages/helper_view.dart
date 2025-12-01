@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/pages/emergency_detail_page.dart';
 
@@ -76,9 +78,9 @@ class _HelperViewPageState extends State<HelperViewPage> {
                 );
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to accept: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Failed to accept: $e')));
               }
             },
             child: const Text('Accept'),
@@ -96,6 +98,51 @@ class _HelperViewPageState extends State<HelperViewPage> {
         title: const Text('Helper View', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFFFC3B3C),
         actions: [
+          // Debug: show token claims (only in debug builds)
+          if (kDebugMode)
+            IconButton(
+              tooltip: 'Show token claims',
+              icon: const Icon(Icons.bug_report),
+              onPressed: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Not signed in')),
+                    );
+                  }
+                  return;
+                }
+                try {
+                  final idtr = await user.getIdTokenResult(true);
+                  final claims = idtr.claims ?? <String, dynamic>{};
+                  if (!mounted) return;
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('ID Token Claims'),
+                      content: SingleChildScrollView(
+                        child: Text(
+                          const JsonEncoder.withIndent('  ').convert(claims),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to get token claims: $e')),
+                    );
+                  }
+                }
+              },
+            ),
           IconButton(
             tooltip: 'Back to Home',
             icon: const Icon(Icons.home),
@@ -130,14 +177,10 @@ class _HelperViewPageState extends State<HelperViewPage> {
                       .snapshots(),
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
+                      return const Center(child: CircularProgressIndicator());
                     }
                     if (snap.hasError) {
-                      return Center(
-                        child: Text('Error: ${snap.error}'),
-                      );
+                      return Center(child: Text('Error: ${snap.error}'));
                     }
 
                     final docs = snap.data?.docs ?? [];
@@ -162,8 +205,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
                             (data['location'] ?? 'unknown location') as String?;
                         final severity =
                             (data['severity'] ?? 'critical') as String?;
-                        final status =
-                            (data['status'] ?? 'pending') as String;
+                        final status = (data['status'] ?? 'pending') as String;
 
                         return ListTile(
                           onTap: () {
@@ -248,11 +290,7 @@ class _HelperViewPageState extends State<HelperViewPage> {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: fg,
-        ),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
       ),
     );
   }
