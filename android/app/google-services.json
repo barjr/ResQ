@@ -39,10 +39,10 @@
               "client_type": 3
             },
             {
-              "client_id": "26341607168-usnrqo6jm5a6sfbadn2hevcddejfjaog.apps.googleusercontent.com",
+              "client_id": "26341607168-sm6e0gpa8oacv11e1qoeiftpcghr59n0.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.resq"
+                "bundle_id": "com.brianresq"
               }
             }
           ]
