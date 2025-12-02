@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:resq/pages/create_account.dart';
+import 'package:resq/pages/sms_mfa_signin_page.dart';
+import 'package:resq/services/mfa_enrollment.dart';
 import 'package:resq/services/role_router.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,72 +26,58 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+Future<void> _handleLogin() async {
+  if (!_formKey.currentState!.validate()) return;
+  setState(() => _isLoading = true);
 
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+  try {
+    // First factor: email + password
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Login successful!')));
-      // after successful signInWithEmailAndPassword:
-      final u = FirebaseAuth.instance.currentUser!;
-      await routeByRole(context, u);
-
-    } on FirebaseAuthException catch (e) {
-      final msg = _friendlyError(e);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: $msg')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    // If we got here with no MFA exception, user is fully signed in.
+    final user = FirebaseAuth.instance.currentUser!;
+    // Enforce “must be enrolled” rule:
+    final ok = await MfaEnrollment.requireAndEnrollIfNeeded(context, user: user);
+    if (!ok) {
+      // User bailed on enrollment – boot them back out
+      await FirebaseAuth.instance.signOut();
+      return;
     }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Login successful!')),
+    );
+    await routeByRole(context, user);
+  } on FirebaseAuthMultiFactorException catch (e) {
+    // User *has* MFA set up – we need the SMS challenge
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SmsMfaSignInPage(exception: e),
+      ),
+    );
+  } on FirebaseAuthException catch (e) {
+    final msg = _friendlyError(e);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Login failed: $msg')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Login failed: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
 
-  /* Future<void> _handleCreateAccount() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
 
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created! You are signed in.')),
-      );
-      //take you to Dashboard automatically
-    } on FirebaseAuthException catch (e) {
-      final msg = _friendlyError(e);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $msg')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  } */
-
-  //TODO: boilerplate, change for security
   String _friendlyError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':
