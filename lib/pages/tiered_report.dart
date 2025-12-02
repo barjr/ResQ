@@ -205,13 +205,6 @@ class _TieredReportPageState extends State<TieredReportPage> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      TextButton(
-                        onPressed: () =>
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Work in progress')),
-                            ),
-                        child: const Text('Helpful Guides'),
-                      ),
                       const Spacer(),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
