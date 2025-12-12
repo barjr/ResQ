@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 
 class EmergencyDetailPage extends StatelessWidget {
@@ -13,6 +15,17 @@ class EmergencyDetailPage extends StatelessWidget {
     required this.requestId,
     required this.data,
   });
+
+  Future<bool> _isCurrentUserAdmin() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return false;
+
+  final tokenResult = await user.getIdTokenResult(true);
+  final role = tokenResult.claims?['role'] as String?;
+
+  return role == 'admin';
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +173,84 @@ Text(
                   ),
                 ),
               ),
+                          const SizedBox(height: 24),
+
+            // --- Admin-only delete button -----------------------------------
+            FutureBuilder<bool>(
+              future: _isCurrentUserAdmin(),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  // You can return SizedBox.shrink() if you don't want a loader
+                  return const SizedBox.shrink();
+                }
+                final isAdmin = snap.data == true;
+                if (!isAdmin) return const SizedBox.shrink();
+
+                return ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.delete_forever),
+                  label: const Text('Delete Emergency Request'),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete this emergency?'),
+                        content: const Text(
+                          'This will permanently remove the emergency request. '
+                          'This action cannot be undone.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(true),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm != true) return;
+
+                    try {
+                      await FirebaseFirestore.instance
+                          .collection('emergency_requests')
+                          .doc(requestId)
+                          .delete();
+
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Emergency request deleted.'),
+                        ),
+                      );
+                      Navigator.of(context).pop(); // back to list
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to delete: $e'),
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
+            // ----------------------------------------------------------------
+
           ],
+          
         ),
       ),
     );

@@ -117,14 +117,6 @@ class _DashboardPageState extends State<DashboardPage> {
               }
             },
           ),
-          IconButton(
-  icon: Icon(Icons.bug_report),
-  onPressed: () async {
-    final user = FirebaseAuth.instance.currentUser;
-    final token = await user?.getIdTokenResult(true);
-    print("ID TOKEN CLAIMS: ${token?.claims}");
-  },
-)
         ],
         bottom: _showDisclaimer
             ? _DisclaimerAppBarBottom(
