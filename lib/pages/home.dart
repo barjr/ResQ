@@ -51,7 +51,10 @@ Future<void> _handleLogin() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Login successful!')),
     );
-    await routeByRole(context, user);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const RoleRouterRoot()),
+      (route) => false,
+    );
   } on FirebaseAuthMultiFactorException catch (e) {
     // User *has* MFA set up – we need the SMS challenge
     if (!mounted) return;

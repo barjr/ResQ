@@ -111,7 +111,10 @@ class _SmsMfaSignInPageState extends State<SmsMfaSignInPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Login successful (MFA).')));
-      await routeByRole(context, user);
+      Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const RoleRouterRoot()),
+      (route) => false,
+    );
     } on FirebaseAuthException catch (e) {
       setState(() {
         _status = 'MFA sign-in failed: ${e.message}';

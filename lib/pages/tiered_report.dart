@@ -1,10 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:resq/services/request_store.dart';
 import 'package:resq/models/help_request.dart' show Severity, Source;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:resq/pages/sos_report.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Source;
+import 'package:resq/services/location_service.dart';
 
 enum _LocalSeverity { minor, urgent, critical }
 
@@ -22,6 +22,9 @@ class _TieredReportPageState extends State<TieredReportPage> {
 
   _LocalSeverity? _selected;
 
+  double? _lat;
+  double? _lng;
+
   @override
   void dispose() {
     _descCtrl.dispose();
@@ -35,7 +38,7 @@ class _TieredReportPageState extends State<TieredReportPage> {
 
     final email = u.email;
     if (email != null && email.contains('@')) {
-      return email.split('@').first; // e.g., "admin0"
+      return email.split('@').first;
     }
 
     final dn = u.displayName?.trim();
@@ -63,22 +66,21 @@ class _TieredReportPageState extends State<TieredReportPage> {
     final reporterUid = currentUser?.uid;
 
     try {
-      // Persist to Firestore (so other devices/helpers see it)
       await FirebaseFirestore.instance.collection('emergency_requests').add({
-  'reporterUid': reporterUid,       // NEW
-  'reporterName': reporter,
-  'description': _descCtrl.text.trim(),
-  'location': _locationCtrl.text.trim().isEmpty
-      ? null
-      : _locationCtrl.text.trim(),
-  'timestamp': FieldValue.serverTimestamp(),
-  'status': 'pending',
-  'severity': severity.name, // 'minor'|'urgent'
-  'source': 'report',
-});
+        'reporterUid': reporterUid,
+        'reporterName': reporter,
+        'description': _descCtrl.text.trim(),
+        'location': _locationCtrl.text.trim().isEmpty
+            ? null
+            : _locationCtrl.text.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'severity': severity.name,
+        'source': 'report',
+        'lat': _lat,
+        'lng': _lng,
+      });
 
-
-      // Still add to in-memory store for immediate local visibility
       RequestStore.instance.addRequest(
         reporterName: reporter,
         description: _descCtrl.text.trim(),
@@ -160,7 +162,6 @@ class _TieredReportPageState extends State<TieredReportPage> {
           const Divider(),
           const SizedBox(height: 8),
 
-          // Minor/Urgent form
           if (_selected == _LocalSeverity.minor ||
               _selected == _LocalSeverity.urgent)
             Form(
@@ -186,14 +187,54 @@ class _TieredReportPageState extends State<TieredReportPage> {
                         : null,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _locationCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Location (optional)',
-                      hintText: 'e.g., Near main stage / 2nd-floor hall',
-                      border: OutlineInputBorder(),
-                    ),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _locationCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Location (optional)',
+                            hintText: 'e.g., Near main stage / 2nd-floor hall',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Use my current location',
+                        icon: const Icon(Icons.my_location),
+                        onPressed: () async {
+                          final pos =
+                              await LocationService.getCurrentPosition();
+                          if (!mounted) return;
+                          if (pos == null) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Unable to get location. Check permissions.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            });
+                            return;
+                          }
+                          setState(() {
+                            _lat = pos.latitude;
+                            _lng = pos.longitude;
+                            _locationCtrl.text =
+                                'Lat: ${pos.latitude.toStringAsFixed(5)}, '
+                                'Lng: ${pos.longitude.toStringAsFixed(5)}';
+                          });
+                        },
+                      ),
+                    ],
                   ),
+
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _submit,
@@ -217,7 +258,6 @@ class _TieredReportPageState extends State<TieredReportPage> {
               ),
             ),
 
-          // Critical branch: show a button that opens SOS report
           if (_selected == _LocalSeverity.critical)
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

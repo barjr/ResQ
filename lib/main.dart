@@ -5,11 +5,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'package:resq/pages/home.dart';
 import 'package:resq/pages/dashboard.dart';
+import 'package:resq/services/role_router.dart';
 import 'package:resq/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseAuth.instance.authStateChanges().listen((user) {
+  debugPrint('AUTH STATE CHANGE: ${user?.uid ?? 'SIGNED OUT'}');
+});
 
   // Initialize notification service
   final notifService = NotificationService();
@@ -28,7 +32,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'ResQ App',
-      home: const AuthGate(),
+      home: const RoleRouterRoot(),
       onUnknownRoute: (settings) =>
           MaterialPageRoute(builder: (_) => const HomePage()),
     );
