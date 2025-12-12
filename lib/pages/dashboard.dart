@@ -1,15 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:resq/pages/emergency_detail_page.dart';
 import 'package:resq/pages/home.dart';
-import 'package:resq/pages/customer_view.dart';
-import 'package:resq/pages/helper_view.dart';
 import 'package:resq/pages/admin_view.dart';
 import 'package:resq/pages/sos_report.dart';
-import 'package:resq/services/request_store.dart';
-import 'package:resq/models/help_request.dart';
 import 'package:resq/pages/tiered_report.dart';
 import 'package:resq/pages/user_settings_page.dart';
-import 'package:resq/services/notification_service.dart';
+import 'package:resq/pages/offline_medical_guides_page.dart';
 
 // Dashboard: central landing page for signed-in users.
 // - Shows an SOS quick action and quick links to Customer/Helper views.
@@ -65,8 +63,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    
     final user = FirebaseAuth.instance.currentUser;
-    final bool isRegular = !widget.isAdmin && !widget.isHelper;
     return Scaffold(
       appBar: AppBar(
         title: Text.rich(
@@ -119,6 +117,14 @@ class _DashboardPageState extends State<DashboardPage> {
               }
             },
           ),
+          IconButton(
+  icon: Icon(Icons.bug_report),
+  onPressed: () async {
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user?.getIdTokenResult(true);
+    print("ID TOKEN CLAIMS: ${token?.claims}");
+  },
+)
         ],
         bottom: _showDisclaimer
             ? _DisclaimerAppBarBottom(
@@ -135,279 +141,178 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             mainAxisSize: MainAxisSize.max,
             children: [
-              if (isRegular) ...[
-                Text(
-                  "Are you in an emergency?",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  "If so, please press the button below.",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                SizedBox(height: 50),
-              ],
+              // --- CUSTOMER TOOLS (SOS + Tiered) ------------------------------------
+// Show to regular users and admins; hide from helpers.
+if (!widget.isHelper || widget.isAdmin) ...[
+  Text(
+    "Are you in an emergency?",
+    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 30),
+  ),
+  const SizedBox(height: 16),
+  const Text(
+    "If so, please press the button below.",
+    style: TextStyle(fontSize: 16, color: Colors.grey),
+  ),
+  const SizedBox(height: 50),
 
-              if (widget.isAdmin || isRegular) ...[
-                TextButton(
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.all(15),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SosReportPage()),
-                    );
-                  },
-                  child: const Text("SOS", style: TextStyle(fontSize: 50)),
-                ),
-                const SizedBox(height: 24),
-                // Not-SOS (Tiered Report) button
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.medical_services_outlined),
-                  label: const Text('Get Help (Not SOS)'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const TieredReportPage(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 12),
+  TextButton(
+    style: TextButton.styleFrom(
+      backgroundColor: Colors.red,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.all(15),
+    ),
+    onPressed: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SosReportPage()),
+      );
+    },
+    child: const Text("SOS", style: TextStyle(fontSize: 50)),
+  ),
+  const SizedBox(height: 24),
 
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const OfflineMedicalGuidesPage(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFC3B3C),
-                    side: const BorderSide(color: Color(0xFFFC3B3C)),
-                    padding: const EdgeInsets.all(20),
-                  ),
-                  icon: const Icon(Icons.local_hospital),
-                  label: const Text(
-                    'View Offline Medical Guides',
-                    style: TextStyle(fontSize: 15),
-                  ),
-                ),
+  OutlinedButton.icon(
+    icon: const Icon(Icons.medical_services_outlined),
+    label: const Text('Get Help (Not SOS)'),
+    onPressed: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const TieredReportPage(),
+        ),
+      );
+    },
+    style: OutlinedButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+    ),
+  ),
+  const SizedBox(height: 12),
+],
+// --- END CUSTOMER TOOLS ------------------------------------------------
 
-                SizedBox(height: 12),
-                // Customer & Helper navigation buttons removed from the
-                // regular user view per product requirement. Regular users
-                // only see the emergency reporting buttons above.
-              ],
-              // Show Customer and Helper view buttons to admins/helpers only
-              if (!isRegular) ...[
-                // Customer view should be admin-only (helpers should not see it)
-                if (widget.isAdmin) ...[
-                  ElevatedButton(
-                    onPressed: () {
+// Offline guides: EVERYONE can see them (user/helper/admin).
+OutlinedButton.icon(
+  onPressed: () {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const OfflineMedicalGuidesPage(),
+      ),
+    );
+  },
+  style: OutlinedButton.styleFrom(
+    foregroundColor: const Color(0xFFFC3B3C),
+    side: const BorderSide(color: Color(0xFFFC3B3C)),
+    padding: const EdgeInsets.all(20),
+  ),
+  icon: const Icon(Icons.local_hospital),
+  label: const Text(
+    'View Offline Medical Guides',
+    style: TextStyle(fontSize: 15),
+  ),
+),
+const SizedBox(height: 12),
+
+// --- Active Emergencies (Firestore) ----------------------------------------
+// Only visible to admin + helper.
+if (widget.isAdmin || widget.isHelper) ...[
+  Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 24),
+        const Align(
+          alignment: Alignment.center,
+          child: Text(
+            'Active Emergencies',
+            style: TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        const SizedBox(height: 8),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('emergency_requests')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snap.hasError) {
+                return Center(child: Text('Error: ${snap.error}'));
+              }
+
+              final docs = snap.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No active emergencies.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final d = docs[index];
+                  final data = d.data();
+
+                  final reporterName =
+                      (data['reporterName'] ?? 'Unknown') as String;
+                  final description =
+                      (data['description'] ?? '') as String;
+                  final location =
+                      (data['location'] ?? 'unknown location') as String?;
+                  final severity =
+                      (data['severity'] ?? 'critical') as String?;
+                  final status =
+                      (data['status'] ?? 'pending') as String;
+
+                  return ListTile(
+                    onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const CustomerViewPage(),
+                          builder: (_) => EmergencyDetailPage(
+                            requestId: d.id,
+                            data: data,
+                          ),
                         ),
                       );
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
+                    leading: _severityChipFromString(severity),
+                    title: Text(reporterName),
+                    subtitle: Text(
+                      '${location ?? 'unknown location'} — '
+                      '${_previewText(description)}\n'
+                      'Status: ${status.toUpperCase()}',
+                    ),
+                    trailing: ElevatedButton(
+                      onPressed: () => _acceptRequest(context, d),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFC3B3C),
+                      ),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(color: Colors.white),
                       ),
                     ),
-                    child: const Text('Customer View'),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  ),
+],
+// --- /Active Emergencies -----------------------------------------------------
 
-                // Helper View available to helpers and admins
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const HelperViewPage()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                  ),
-                  child: const Text('Helper View'),
-                ),
-              ],
-
-              // --- Active Emergencies ------------------------------------------------------
-              // Only show the active emergencies list to admins and helpers.
-              // Regular users do not need to see this section.
-              if (widget.isAdmin || widget.isHelper) ...[
-                // The list below is driven by `RequestStore.instance.stream`.
-                // Each HelpRequest is rendered as a ListTile. The cancel flow
-                // shows a confirmation dialog, removes the request from the
-                // store on confirmation, and displays a SnackBar with an
-                // UNDO action (which re-adds the request). Keep UI changes
-                // guarded with `context.mounted` to avoid operating on a
-                // disposed State after async gaps.
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 24),
-                      const Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Active Emergencies',
-                          style: TextStyle(
-                            fontSize: 23,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      const SizedBox(height: 8),
-
-                      // List takes the remaining space and scrolls
-                      Expanded(
-                        child: StreamBuilder<List<HelpRequest>>(
-                          stream: RequestStore.instance.stream,
-                          builder: (context, snapshot) {
-                            final items =
-                                snapshot.data ?? const <HelpRequest>[];
-
-                            if (items.isEmpty) {
-                              return Center(
-                                child: Text(
-                                  'No active emergencies.',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                              );
-                            }
-
-                            return ListView.separated(
-                              padding: EdgeInsets.zero,
-                              itemCount: items.length,
-                              separatorBuilder: (_, _) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (context, i) {
-                                final r = items[i];
-                                return ListTile(
-                                  contentPadding: EdgeInsets.zero,
-
-                                  // ---------- Show severity chip ----------
-                                  leading: _severityChip(r.severity),
-
-                                  // ------------------------------------------------
-                                  title: Text(
-                                    _preview(r.description),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Padding(
-                                    padding: const EdgeInsets.only(top: 2.0),
-                                    child: Text(
-                                      _formatTime(r.createdAt),
-                                      style: const TextStyle(
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-                                  trailing: TextButton(
-                                    onPressed: () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (_) => AlertDialog(
-                                          title: const Text(
-                                            'Cancel emergency?',
-                                          ),
-                                          content: const Text(
-                                            'This will remove the emergency from your active list.',
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.of(
-                                                context,
-                                              ).pop(false),
-                                              child: const Text('No'),
-                                            ),
-                                            FilledButton(
-                                              style: FilledButton.styleFrom(
-                                                backgroundColor: Colors.red,
-                                              ),
-                                              onPressed: () => Navigator.of(
-                                                context,
-                                              ).pop(true),
-                                              child: const Text('Yes, cancel'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-
-                                      if (confirm == true) {
-                                        final removed = r;
-                                        RequestStore.instance.removeRequest(
-                                          r.id,
-                                        );
-
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: const Text(
-                                              'Emergency canceled',
-                                            ),
-                                            action: SnackBarAction(
-                                              label: 'UNDO',
-                                              onPressed: () {
-                                                // ---------- Restore full request ----------
-                                                RequestStore.instance
-                                                    .addRequest(
-                                                      description:
-                                                          removed.description,
-                                                      location:
-                                                          removed.location,
-                                                      reporterName:
-                                                          removed.reporterName,
-                                                      severity:
-                                                          removed.severity,
-                                                      source: removed.source,
-                                                    );
-                                                // ------------------------------------------------
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    child: const Text('Cancel'),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              // --- /Active Emergencies -----------------------------------------------------
             ],
           ),
         ),
@@ -437,23 +342,104 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // ---------- Severity chip helper --------------------------------------
-  Widget _severityChip(Severity s) {
-    String label = 'UNKNOWN';
+    // ---------- Firestore helper actions for Active Emergencies ----------
+
+  Future<void> _acceptRequest(
+    BuildContext context,
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to accept.')),
+      );
+      return;
+    }
+
+    final data = doc.data() ?? {};
+    final reporterName = (data['reporterName'] ?? 'Unknown') as String;
+    final severity = (data['severity'] ?? 'critical') as String?;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Accept Request'),
+        content: Text(
+          'Accept ${_severityLabel(severity)} request from $reporterName?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop(); // close dialog
+
+              try {
+                await doc.reference.update({
+                  'status': 'accepted',
+                  'acceptedBy': user.uid,
+                  'acceptedAt': FieldValue.serverTimestamp(),
+                });
+
+                if (!mounted) return;
+
+                final updatedData = Map<String, dynamic>.from(data);
+                updatedData['status'] = 'accepted';
+                updatedData['acceptedBy'] = user.uid;
+
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => EmergencyDetailPage(
+                      requestId: doc.id,
+                      data: updatedData,
+                    ),
+                  ),
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('You accepted $reporterName')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to accept: $e')),
+                );
+              }
+            },
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _severityLabel(String? s) {
+    switch (s) {
+      case 'minor':
+        return 'MINOR';
+      case 'urgent':
+        return 'URGENT';
+      case 'critical':
+      default:
+        return 'CRITICAL';
+    }
+  }
+
+  Widget _severityChipFromString(String? s) {
+    final label = _severityLabel(s);
     Color bg = const Color(0xFFE0E0E0);
     Color fg = const Color(0xFF424242);
 
-    if (s == Severity.minor) {
-      label = 'MINOR';
-      bg = const Color(0xFFE8F5E9); // light green
+    if (s == 'minor') {
+      bg = const Color(0xFFE8F5E9);
       fg = const Color(0xFF2E7D32);
-    } else if (s == Severity.urgent) {
-      label = 'URGENT';
-      bg = const Color(0xFFFFF3E0); // light orange
+    } else if (s == 'urgent') {
+      bg = const Color(0xFFFFF3E0);
       fg = const Color(0xFFEF6C00);
-    } else if (s == Severity.critical) {
-      label = 'CRITICAL';
-      bg = const Color(0xFFFFEBEE); // light red
+    } else if (s == 'critical') {
+      bg = const Color(0xFFFFEBEE);
       fg = const Color(0xFFC62828);
     }
 
@@ -466,21 +452,16 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
       ),
     );
   }
-  // ---------------------------------------------------------------------------
 
-  String _formatTime(DateTime dt) {
-    // h:mm AM/PM without bringing in intl
-    String two(int v) => v.toString().padLeft(2, '0');
-    final hour12 = (dt.hour % 12 == 0) ? 12 : dt.hour % 12;
-    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-    return '$hour12:${two(dt.minute)} $ampm';
-  }
-
-  String _preview(String text, {int words = 8}) {
+  String _previewText(String text, {int words = 6}) {
     final tokens = text
         .trim()
         .split(RegExp(r'\s+'))
@@ -490,6 +471,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final head = tokens.take(words).join(' ');
     return tokens.length > words ? '$head…' : head;
   }
+
 }
 
 // Small disclaimer shown at the bottom of the AppBar. Kept as a separate
@@ -535,30 +517,4 @@ class _DisclaimerAppBarBottom extends StatelessWidget
     );
   }
 
-  // This is for notifications??
-  Future<void> _saveTokenIfHelperOrAdmin() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Get user's role from custom claims
-      final idTokenResult = await user.getIdTokenResult(true);
-      final role = idTokenResult.claims?['role'] as String?;
-
-      debugPrint('User role: $role');
-
-      // Save token for all users (the Cloud Function will filter by role)
-      final notifService = NotificationService();
-      final token = await notifService.initialize();
-
-      if (token != null) {
-        await notifService.saveUserToken(user.uid, token);
-        debugPrint('Token saved for user: ${user.uid}, role: $role');
-      } else {
-        debugPrint('No FCM token available');
-      }
-    } catch (e) {
-      debugPrint('Error saving token: $e');
-    }
-  }
 }

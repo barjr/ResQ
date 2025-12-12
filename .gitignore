@@ -50,3 +50,14 @@ app.*.map.json
 
 #chase's key
 serviceAccountKey.json
+
+# Flutter / Dart things you probably already have
+build/
+.dart_tool/
+
+# Node / Firebase Functions
+node_modules/
+functions/node_modules/
+functions/.runtimeconfig.json
+functions/serviceAccountKey.json
+

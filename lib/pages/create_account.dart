@@ -4,8 +4,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:resq/pages/mfa_enroll_page.dart';
 import 'package:resq/constants/mfa_whitelist.dart';
+import 'package:resq/pages/mfa_enroll_page.dart';
 import 'package:resq/services/notification_service.dart';
 import 'package:resq/services/role_router.dart';
 
@@ -198,7 +198,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
             : _medicalIdCtrl.text.trim(),
         'isBystander': _isBystander,
         'createdAt': FieldValue.serverTimestamp(),
-        'role': _chosenRole,
       }, SetOptions(merge: true));
 
       // 3) Set initial role claim
@@ -343,7 +342,7 @@ Navigator.of(context).pushAndRemoveUntil(
                   // Role choice
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
-                    child: Text('Choose your role (you can change later)', style: Theme.of(context).textTheme.titleSmall),
+                    child: Text('Choose your role', style: Theme.of(context).textTheme.titleSmall),
                   ),
                   Row(
                     children: [
