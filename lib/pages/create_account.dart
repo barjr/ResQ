@@ -198,6 +198,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
             : _medicalIdCtrl.text.trim(),
         'isBystander': _isBystander,
         'createdAt': FieldValue.serverTimestamp(),
+        'role': _chosenRole,
       }, SetOptions(merge: true));
 
       // 3) Set initial role claim
@@ -249,10 +250,14 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
           content: Text('Account created! Check your email to verify.'),
         ),
       );
-final email = user?.email?.toLowerCase().trim();
+final email = user.email?.toLowerCase().trim();
 
 if (email != null && mfaBypassEmails.contains(email)) {
-  await routeByRole(context, user!);
+  if (!mounted) return;
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const RoleRouterRoot()),
+    (route) => false,
+  );
   return;
 }
 

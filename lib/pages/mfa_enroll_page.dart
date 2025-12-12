@@ -71,8 +71,10 @@ void initState() {
         content: Text('MFA bypass enabled for $email'),
       ),
     );
-
-    await routeByRole(context, user);
+Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const RoleRouterRoot()),
+      (route) => false,
+    );
   }
 }
 
@@ -92,7 +94,6 @@ void initState() {
     bool totp = false;
 
     for (final f in factors) {
-      // These type checks come from firebase_auth’s MultiFactorInfo subclasses
       if (f is PhoneMultiFactorInfo) {
         sms = true;
       }
@@ -123,7 +124,6 @@ void initState() {
       return;
     }
 
-    // 🔄 Always reload before checking emailVerified
     await user.reload();
     user = FirebaseAuth.instance.currentUser;
 
@@ -339,7 +339,10 @@ Future<void> _handleContinue() async {
   }
 
   // Send user straight to the correct dashboard based on their role
-  await routeByRole(context, user);
+  Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const RoleRouterRoot()),
+      (route) => false,
+    );
 }
 
 

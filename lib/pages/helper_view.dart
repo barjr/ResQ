@@ -14,7 +14,6 @@ class HelperViewPage extends StatefulWidget {
 }
 
 class _HelperViewPageState extends State<HelperViewPage> {
-  // No more RequestStore subscription – we read directly from Firestore.
 
   Future<void> _acceptRequest(
     BuildContext context,
