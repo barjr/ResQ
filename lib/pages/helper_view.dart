@@ -94,11 +94,11 @@ class _HelperViewPageState extends State<HelperViewPage> {
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Helper View', style: TextStyle(color: Colors.white)),
+        title: const Text('List of Active Emergencies', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFFFC3B3C),
         actions: [
           // Debug: show token claims (only in debug builds)
-          if (kDebugMode)
+          if (false)
             IconButton(
               tooltip: 'Show token claims',
               icon: const Icon(Icons.bug_report),
